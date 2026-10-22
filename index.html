@@ -412,7 +412,7 @@ function spiceNeeds(start,end){
   for(let d=start; d<=end; d=add(d,1)){ const day = S.plan.days[d]; if(!day) continue;
     Object.keys(KEY_PERSONS).forEach(k=>{ if(isFlex(d,k)) return; const run = getRun(d,k).filter(x=>!isFlex(x,k)), id = day[k], key = k+run[0]+id; if(seen.has(key)) return; seen.add(key);
       const m = MEALS[id], persons = KEY_PERSONS[k];
-      const tot = f => run.reduce((a,x)=>a+persons.reduce((b,p)=>b+m.comps.filter(c=>c[0]===f).reduce((z,c)=>z+raw(x,p,c),0),0),0);
+      const tot = f => run.reduce((a,x)=>a+eaters(x,k).reduce((b,p)=>b+m.comps.filter(c=>c[0]===f).reduce((z,c)=>z+raw(x,p,c),0),0),0);
       const lb = tot(m.comps[0][0])/454;
       Object.entries(m.season||{}).forEach(([sid,[amt,unit]])=>{ g[sid] = (g[sid]||0) + amt*lb*(unit==='tbsp'?3:1)*(G_PER_TSP[sid]||2.5); });
 
@@ -422,7 +422,9 @@ function spiceNeeds(start,end){
 }
 const shows = p => S.view.mode==='both' || p===S.view.me || p==='L';
 function isWeekend(d){ const w = dow(d); return w===0 || w===6; }
-function isFlex(d,k){ if(k==='ys') return true; if(k==='c') return false; if(S.plan.days[d] && S.plan.days[d].off) return true; if(!isWeekend(d)) return false; const m = S.settings.weekend; return m==='none' || (m==='light' && k!=='d'); }
+const eaters = (d,k) => { const a = (S.plan.days[d]||{}).away||[]; return KEY_PERSONS[k].filter(p=>!a.includes(p)); };
+const isAway = (d,p) => ((S.plan.days[d]||{}).away||[]).includes(p);
+function isFlex(d,k){ if(k==='ys') return true; if(!eaters(d,k).length) return true; if(((S.plan.days[d]||{}).flex||[]).includes(k)) return true; if(k==='c') return false; if(S.plan.days[d] && S.plan.days[d].off) return true; if(!isWeekend(d)) return false; const m = S.settings.weekend; return m==='none' || (m==='light' && k!=='d'); }
 
 const ui = {macOpen:{}, mealOpen:{}, tab:'calendar', sel:TODAY, ym:[pd(TODAY).getFullYear(), pd(TODAY).getMonth()], gc:null, ptab:'freezer'};
 
@@ -433,14 +435,14 @@ function fac(date,p){
   if(p==='L') p='Y';
   const day = S.plan.days[date]; if(!day) return 1;
   let b = 0, fixed = 0;
-  PERSON_KEYS[p].forEach(k=>MEALS[day[k]].comps.forEach(c=>{ const kc = FOODS[c[0]].k*cg(c,p)/100; if(FOODS[c[0]].fixed) fixed += kc; else b += kc; }));
+  PERSON_KEYS[p].filter(k=>MEALS[day[k]]).forEach(k=>MEALS[day[k]].comps.forEach(c=>{ const kc = FOODS[c[0]].k*cg(c,p)/100; if(FOODS[c[0]].fixed) fixed += kc; else b += kc; }));
   return Math.min(1.45, Math.max(.7, (S.macros[p].kcal - fixed)/b));
 }
 // Fixed items (the morning latte) stay the same size; everything else scales to hit targets.
 const raw = (date,p,c) => FOODS[c[0]].fixed ? cg(c,p) : cg(c,p)*fac(date,p);
 function dayMacros(date,p){
   const day = S.plan.days[date], t = {k:0,p:0,c:0,f:0};
-  PERSON_KEYS[p].filter(k=>!isFlex(date,k) && !isSkipped(date,k)).forEach(k=>MEALS[day[k]].comps.forEach(c=>{ const f = FOODS[c[0]], g = raw(date,p,c)/100; t.k+=f.k*g; t.p+=f.p*g; t.c+=f.c*g; t.f+=f.f*g; }));
+  PERSON_KEYS[p].filter(k=>!isFlex(date,k) && !isSkipped(date,k) && !isAway(date,p)).forEach(k=>MEALS[day[k]].comps.forEach(c=>{ const f = FOODS[c[0]], g = raw(date,p,c)/100; t.k+=f.k*g; t.p+=f.p*g; t.c+=f.c*g; t.f+=f.f*g; }));
   return t;
 }
 const targets = p => { const m = S.macros[p]; return {k:m.kcal, p:m.kcal*m.p/400, c:m.kcal*m.c/400, f:m.kcal*m.f/900}; };
@@ -459,7 +461,7 @@ function groups(date,key){
     const g = c[3];
     if(!G[g]){ G[g] = {name:g, comps:[], batchRaw:0, exp:0}; order.push(g); }
     G[g].comps.push(c);
-    run.filter(d=>!isFlex(d,key)).forEach(d=>persons.forEach(p=>{ const r = raw(d,p,c); G[g].batchRaw += r; G[g].exp += r*FOODS[c[0]].y; }));
+    run.filter(d=>!isFlex(d,key)).forEach(d=>eaters(d,key).forEach(p=>{ const r = raw(d,p,c); G[g].batchRaw += r; G[g].exp += r*FOODS[c[0]].y; }));
   });
   const list = order.map(n=>{
     const g = G[n];
@@ -555,7 +557,7 @@ function needsRange(start,end,shopWeek){
       if(shopWeek && d===start && MORNING.includes(k)) return;
       if(shopWeek && d===last && !MORNING.includes(k)) return;
       const m = MEALS[day[k]]; meals.add(day[k]); (m.spices||[]).forEach(s=>spices.add(s));
-      KEY_PERSONS[k].forEach(p=>m.comps.forEach(cc=>{ const r = raw(d,p,cc); need[cc[0]] = (need[cc[0]]||0)+r; if(shopWeek && d>mid && FOODS[cc[0]].cat==='Produce') late[cc[0]] = (late[cc[0]]||0)+r; if(FOODS[cc[0]].pantry) spices.add(FOODS[cc[0]].pantry); }));
+      eaters(d,k).forEach(p=>m.comps.forEach(cc=>{ const r = raw(d,p,cc); need[cc[0]] = (need[cc[0]]||0)+r; if(shopWeek && d>mid && FOODS[cc[0]].cat==='Produce') late[cc[0]] = (late[cc[0]]||0)+r; if(FOODS[cc[0]].pantry) spices.add(FOODS[cc[0]].pantry); }));
     });
   }
   return {need, late, spices, meals, mid};
@@ -638,6 +640,7 @@ function vCalendar(){
 }
 
 function personSummary(date,p){
+  if(isAway(date,p)) return `<div class="p" style="--pc:${PC[p]}"><div class="pname"><span class="pdot"></span>${NAMES[p]}</div><div class="kcal">Away today</div></div>`;
   const a = dayMacros(date,p), t = targets(p), pct = (x,y) => Math.min(100, Math.round(x/y*100));
   const row = (lbl,x,y) => `<div class="mrow"><b>${lbl}</b><div class="bar"><i style="width:${pct(x,y)}%"></i></div><span class="v">${Math.round(x)}/${Math.round(y)}g</span></div>`;
   return `<div class="p" style="--pc:${PC[p]}"><div class="pname"><span class="pdot"></span>${NAMES[p]}</div>
@@ -650,7 +653,7 @@ function mealCard(date,key){
   const run = G.run, idx = run.indexOf(date), cyc = S.plan.cycles[cycleOf(date)];
   const who = fam ? `<div class="who" style="--pc:var(--accent)">Family dinner</div>` : key==='l' ? `<div class="who" style="--pc:var(--accent)">Shared lunch · Kaleb & Kayla</div>` : key==='c' ? `<div class="who" style="--pc:var(--accent)">Both of you · every morning</div>` : `<div class="who" style="--pc:${PC[persons[0]]}"><span class="pdot"></span>${NAMES[persons[0]]}</div>`;
   const tags = (m.style?`<span class="tag style" style="--sc:${STYLE_COLOR[m.style]}">${m.style}</span>`:'')+`<span class="tag">${m.tool}</span>`+(run.length>1&&key!=='c'?`<span class="tag">Day ${idx+1} of ${run.length}</span>`:'');
-  const vis = persons.filter(shows);
+  const vis = eaters(date,key).filter(shows);
   const tape = (p,txt) => `<span class="tape" style="--pc:${PC[p]}"><b>${p}</b>${txt}</span>`;
   const rows = G.list.map(g=> g.cooks || g.each || g.scoop
     ? `<div class="grow"><span class="gname">${esc(g.name)}</span><span class="tapes">${vis.map(p=>tape(p,fmtPortion(g,p))).join('')}</span></div>`
@@ -658,12 +661,12 @@ function mealCard(date,key){
   const cookedNote = G.list.some(g=>g.cooks) ? `<div class="note">Eyeball amounts for cooked food. Exact grams are in the recipe. Cooked ${nice(cyc.start)}${idx>0||run[0]!==cyc.start?' · leftovers':''}.</div>` : '';
   // ingredients (raw, per person today)
   const live = G.run.filter(d=>!isFlex(d,key));
-  const tot = {}; m.comps.forEach(c=>{ tot[c[0]] = (tot[c[0]]||0) + live.reduce((a,d)=>a+persons.reduce((b,p)=>b+raw(d,p,c),0),0); });
+  const tot = {}; m.comps.forEach(c=>{ tot[c[0]] = (tot[c[0]]||0) + live.reduce((a,d)=>a+eaters(d,key).reduce((b,p)=>b+raw(d,p,c),0),0); });
   const lb = (tot[m.comps[0][0]]||0)/454, sea = m.season||{};
   const ing = Object.keys(tot).map(f=>`<tr><td>${esc(FOODS[f].n)}</td><td class="n">${household(f,tot[f])}</td></tr>`).join('') + Object.keys(sea).map(k=>`<tr><td>${esc(SPICE_N[k]||k)}</td><td class="n">${spiceAmt(sea[k][0],sea[k][1],lb)}</td></tr>`).join('');
   const stepTxt = st => esc(st).replace(/\{f:(\w+)\}/g,(x,f)=>`<b class="q">(${household(f,tot[f]||0)})</b>`).replace(/\{s:(\w+)\}/g,(x,k)=>sea[k]?`<b class="q">(${spiceAmt(sea[k][0],sea[k][1],lb)})</b>`:'');
   const help = G.list.filter(g=>g.cooks).map(g=>{
-    const meat = g.comps.filter(c=>FOODS[c[0]].cat==='Meat').map(c=>{ const t = G.run.reduce((a,d)=>a+persons.reduce((b,p)=>b+raw(d,p,c),0),0); return `${FOODS[c[0]].n}: ${Math.round(t)} g raw → ${Math.max(1,Math.ceil(t/454-.05))} lb`; }).join('; ');
+    const meat = g.comps.filter(c=>FOODS[c[0]].cat==='Meat').map(c=>{ const t = G.run.filter(d=>!isFlex(d,key)).reduce((a,d)=>a+eaters(d,key).reduce((b,p)=>b+raw(d,p,c),0),0); return `${FOODS[c[0]].n}: ${Math.round(t)} g raw → ${Math.max(1,Math.ceil(t/454-.05))} lb`; }).join('; ');
     return `<div class="ch"><span class="t">${esc(g.name)}</span><input class="numin" inputmode="numeric" id="ck-${esc(G.runId+'-'+g.name).replace(/[^a-z0-9]/gi,'_')}" data-act="cooked" data-run="${esc(G.runId)}" data-grp="${esc(g.name)}" placeholder="${Math.round(g.exp)}" value="${g.actual||''}" aria-label="Cooked weight of ${esc(g.name)} in grams"><span class="s">Whole batch: ${Math.round(g.batchRaw)} g raw → about ${Math.round(g.exp)} g cooked. Enter the real cooked weight.${meat?'<br>'+meat:''}</span></div>`;
   }).join('');
   const okey = date+'|'+key;
@@ -702,14 +705,14 @@ function vDay(){
   if(mk.prep){ const c = S.plan.cycles[cycleOf(d)], ms = new Set(); for(let x=c.start;x<=c.end;x=add(x,1)) Object.keys(KEY_SLOT).forEach(k=>{ if(isFlex(x,k)) return; const mm = MEALS[S.plan.days[x][k]]; if(mm.tool!=='No cook' && mm.tool!=='Make day-of') ms.add(mm.n); }); banners += `<div class="banner prep">${I.pot}<div><b>Prep day</b>Cook: ${[...ms].map(esc).join(', ')}.</div></div>`; }
   if(mk.thaw){ const nc = S.plan.cycles[mk.next]; banners += `<div class="banner thaw">${I.snow}<div><b>Move to the fridge tonight</b>${thawList(mk.next).map(t=>`${esc(FOODS[t.f].n)} ${t.lb} lb`).join(' · ')} <span class="small muted">for ${nice(nc.start)} prep</span></div></div>`; }
   if(mk.shop && mk.week>=0){ const w = shopWeeks()[mk.week]; banners += `<div class="banner shop">${I.cart}<div><b>Shopping day · covers ${nice(w.start)} – ${nice(w.end)}</b><button class="linkbtn" data-act="goList" data-ci="${mk.week}">See the list</button></div></div>`; }
-  const flexCard = k => `<article class="meal" style="border-style:dashed"><div class="mtop"><div class="mtitle">${k==='d'||k==='l'?`<div class="who" style="--pc:var(--accent)">${k==='d'?'Family dinner':'Shared lunch'}</div>`:`<div class="who" style="--pc:${PC[KEY_PERSONS[k][0]]}"><span class="pdot"></span>${NAMES[KEY_PERSONS[k][0]]}</div>`}<h3>${k==='ys'?'Nothing planned':S.plan.days[d].off?'Open':'Flex'}</h3><div class="note">${k==='ys'?'Snacks are off for now.':S.plan.days[d].off?'Plan pushed back a day. Use leftovers or eat out.':'Eat leftovers from the week first, then whatever fits the day.'}</div></div></div></article>`;
+  const flexCard = k => `<article class="meal" style="border-style:dashed"><div class="mtop"><div class="mtitle">${k==='d'||k==='l'?`<div class="who" style="--pc:var(--accent)">${k==='d'?'Family dinner':'Shared lunch'}</div>`:`<div class="who" style="--pc:${PC[KEY_PERSONS[k][0]]}"><span class="pdot"></span>${NAMES[KEY_PERSONS[k][0]]}</div>`}<h3>${k==='ys'?'Nothing planned':!eaters(d,k).length?'Away':S.plan.days[d].off?'Open':'Flex'}</h3><div class="note">${k==='ys'?'Snacks are off for now.':!eaters(d,k).length?`${NAMES[KEY_PERSONS[k][0]]} is away today. Nothing planned.`:S.plan.days[d].off?'Plan pushed back a day. Use leftovers or eat out.':'Eat leftovers from the week first, then whatever fits the day.'}</div></div></div></article>`;
   const mp = {id:day.d}, drink = isDrinkNight(d) ? (()=>{ const x = MEALS[mp.id].pair; return `<button class="drinkcard" data-act="drink" data-id="${mp.id}"><span class="b drink" style="width:28px;height:28px;border-radius:8px">${GLASS[x.glass][1]}</span><span class="grow1"><b>${esc(x.n)}</b> <span class="small muted">· ${x.kind} pairing</span></span><span class="small" style="color:var(--accent);font-weight:700">Recipe ›</span></button>`; })() : '';
   const slot = (label,keys) => { keys = keys.filter(k=>KEY_PERSONS[k].some(shows)); if(!keys.length) return ''; return `<section class="slot"><div class="eyebrow">${label}</div>${keys.map(k=>isFlex(d,k)?flexCard(k):mealCard(d,k)).join('')}${keys.includes('d')?drink:''}</section>`; };
   const wk = isWeekend(d) && S.settings.weekend!=='full' ? `<div class="banner prep">${I.cal}<div><b>Light weekend</b>${S.settings.weekend==='light'?'Only dinner is planned. Use up leftovers from missed meals for the rest.':'Nothing planned. Use up leftovers from the week.'}</div></div>` : '';
   const lockb = isLocked(d) ? `<div class="banner shop">${I.cart}<div><b>Shopping done · week locked</b>Swaps only use food you bought. New requests go to next week.</div></div>` : '';
   const seg = `<div class="seg"><button class="${S.view.mode==='mine'?'on':''}" data-act="vmode" data-v="mine">Just ${NAMES[S.view.me]}</button><button class="${S.view.mode==='both'?'on':''}" data-act="vmode" data-v="both">Both of us</button></div>`;
   return head + seg + lockb + wk + banners +
-    `<div class="card"><div class="sum" ${S.view.mode==='mine'?'style="grid-template-columns:1fr"':''}>${['K','Y'].filter(shows).map(p=>personSummary(d,p)).join('')}</div><p class="note" style="margin:10px 0 0">Landen eats dinner only, at ${S.settings.landen}% of Kayla's portion.</p></div>` +
+    `<div class="card"><div class="sum" ${S.view.mode==='mine'?'style="grid-template-columns:1fr"':''}>${['K','Y'].filter(shows).map(p=>personSummary(d,p)).join('')}</div><p class="note" style="margin:10px 0 0">${(day.away||[]).length?`${day.away.map(p=>NAMES[p]).join(' & ')} away today: shared meals are sized without ${day.away.length>1?'them':'him'}. `:''}Landen eats dinner only, at ${S.settings.landen}% of Kayla's portion.</p></div>` +
     slot('Breakfast',['c','kb','yb']) + slot('Lunch',['l']) + slot('Dinner',['d']) + slot('Snacks',['ks','ys']);
 }
 
@@ -757,12 +760,13 @@ function vGroceries(){
   const sec = cats.filter(k=>rows[k]).map(k=>`<div class="card"><div class="eyebrow">${k==='Midweek'?`Midweek fresh trip · ${nice(mid)}`:k}</div>${rows[k].sort((a,b)=>b.packs-a.packs).map(item).join('')}</div>`).join('');
   const sp = buySp.length ? `<div class="card"><div class="eyebrow">Seasonings</div>${buySp.map(x=>cbox(ci+'|sp-'+x.id, `<span class="grow1">${esc(x.n)}</span><span class="q">1<br><span class="money muted">$3.49</span></span>`)).join('')}</div>` : '';
   const rc = S.requests.filter(r=>/^Receipt/.test(r.text||'') && r.status!=='Done').length;
+  const noBudget = !!(S.settings.budgetFrom && c.start.slice(0,7) < S.settings.budgetFrom);
   return `<div class="dayhead"><button class="iconbtn" data-act="gnav" data-dir="-1" aria-label="Previous week" ${ci<=0?'disabled':''}>${I.left}</button><h2 style="font-size:19px">Shop ${nice(c.start)}</h2><button class="iconbtn" data-act="gnav" data-dir="1" aria-label="Next week" ${ci>=W.length-1?'disabled':''}>${I.right}</button></div>
   <p class="note" style="margin:-6px 0 0;text-align:center">${esc(S.settings.store)} · covers ${nice(c.start)} dinner through ${nice(add(c.end,1))} lunch</p>
   <div class="row" style="justify-content:center;gap:6px;flex-wrap:wrap"><span class="small muted">Shopping day:</span>${DOW.map((d,i)=>`<button class="chip ${S.settings.shopDay===i?'on':''}" style="padding:4px 9px;font-size:12.5px" data-act="shopday" data-i="${i}">${d}</button>`).join('')}</div>
-  <div class="card budget"><div class="row between"><span class="eyebrow">Estimated</span><span class="eyebrow">Monthly pace</span></div>
-    <div class="row between"><span class="bignum money">$${total.toFixed(2)}</span><span class="money" style="font-size:17px;color:${pace>budget?'var(--bad)':'var(--good)'}">$${Math.round(pace)} / $${budget}</span></div>
-    <div class="bar" style="--pc:${pace>budget?'var(--bad)':'var(--good)'}"><i style="width:${pct}%"></i></div>
+  ${''}<div class="card budget"><div class="row between"><span class="eyebrow">Estimated</span><span class="eyebrow">${noBudget?'':'Monthly pace'}</span></div>
+    <div class="row between"><span class="bignum money">$${total.toFixed(2)}</span>${noBudget?`<span class="small muted">Budget starts ${MON[+S.settings.budgetFrom.slice(5,7)-1]}</span></div>`:`<span class="money" style="font-size:17px;color:${pace>budget?'var(--bad)':'var(--good)'}">$${Math.round(pace)} / $${budget}</span></div>
+    <div class="bar" style="--pc:${pace>budget?'var(--bad)':'var(--good)'}"><i style="width:${pct}%"></i></div>`}
     ${(S.locked||{})[c.start]
       ? `<div class="status"><span style="flex:1"><b>Shopping complete.</b> This week is locked.</span><button class="btn" style="padding:6px 12px" data-act="unlock" data-s="${c.start}">Undo</button></div>`
       : `<button class="btn primary block" data-act="cart" data-ci="${ci}">Add to Meijer cart</button>
