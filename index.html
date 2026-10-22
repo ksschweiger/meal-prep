@@ -282,6 +282,8 @@ const KEY_PERSONS = {c:['K','Y'],kb:['K'],l:['K','Y'],ks:['K'],yb:['Y'],ys:['Y']
 const PERSON_KEYS = {K:['c','kb','l','d','ks'],Y:['c','yb','l','d','ys']};
 const NAMES = {K:'Kaleb',Y:'Kayla',L:'Landen'};
 const PC = {K:'var(--k)',Y:'var(--y)',L:'var(--l)'};
+// Letter shown on portion labels (internal codes stay K/Y/L): H = husband (Kaleb), W = wife (Kayla).
+const TAPE_LETTER = {K:'H',Y:'W',L:'L'};
 const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const MON = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DINNER_ROT = ['pasta','stirfry','chili','greek','taco','sheetpan','beefbroc'];
@@ -659,7 +661,7 @@ function mealCard(date,key){
   const who = fam ? `<div class="who" style="--pc:var(--accent)">Family dinner</div>` : key==='l' ? `<div class="who" style="--pc:var(--accent)">Shared lunch · Kaleb & Kayla</div>` : key==='c' ? `<div class="who" style="--pc:var(--accent)">Both of you · every morning</div>` : `<div class="who" style="--pc:${PC[persons[0]]}"><span class="pdot"></span>${NAMES[persons[0]]}</div>`;
   const tags = (m.style?`<span class="tag style" style="--sc:${STYLE_COLOR[m.style]}">${m.style}</span>`:'')+`<span class="tag">${m.tool}</span>`+(run.length>1&&key!=='c'?`<span class="tag">Day ${idx+1} of ${run.length}</span>`:'');
   const vis = eaters(date,key).filter(shows);
-  const tape = (p,txt) => `<span class="tape" style="--pc:${PC[p]}"><b>${p}</b>${txt}</span>`;
+  const tape = (p,txt) => `<span class="tape" style="--pc:${PC[p]}"><b title="${NAMES[p]}">${TAPE_LETTER[p]||p}</b>${txt}</span>`;
   const rows = G.list.map(g=> g.cooks || g.each || g.scoop
     ? `<div class="grow"><span class="gname">${esc(g.name)}</span><span class="tapes">${vis.map(p=>tape(p,fmtPortion(g,p))).join('')}</span></div>`
     : g.comps.map(c=>`<div class="grow"><span class="gname">${esc(FOODS[c[0]].n)}</span><span class="tapes">${vis.filter(p=>cg(c,p)>0).map(p=>tape(p,household(c[0],raw(date,p,c)))).join('')}</span></div>`).join('')).join('');
