@@ -637,7 +637,7 @@ function vCalendar(){
   <div class="calhead"><button class="iconbtn" data-act="mon" data-dir="-1" aria-label="Previous month">${I.left}</button><h2>${MON[m]} ${y}</h2><button class="iconbtn" data-act="mon" data-dir="1" aria-label="Next month">${I.right}</button></div>
   <div><div class="dows">${DOW.map(d=>`<div>${d}</div>`).join('')}</div><div class="cal" style="margin-top:4px">${cells}</div></div>
   <div class="legend"><span><span class="b prep">${I.pot}</span>Prep day</span><span><span class="b shop">${I.cart}</span>Shop / pickup</span><span><span class="b thaw">${I.snow}</span>Thaw</span><span><span class="b drink">${GLASS.red[1]}</span>Drink pairing</span><span>↳ Leftovers</span></div>
-  <p class="note">Sample plan with placeholder macros. Tap any day to see portions.</p>`;
+  <p class="note">Tap any day to see portions.</p>`;
 }
 
 function personSummary(date,p){
@@ -648,6 +648,10 @@ function personSummary(date,p){
     <div class="kcal">${Math.round(a.k).toLocaleString()} / ${t.k.toLocaleString()} cal</div><div class="bar"><i style="width:${pct(a.k,t.k)}%"></i></div>
     ${row('P',a.p,t.p)}${row('C',a.c,t.c)}${row('F',a.f,t.f)}</div>`;
 }
+
+// Recipe source link label: "Spend With Pennies" for spendwithpennies.com, else the bare domain.
+const SRC_NAMES = {'spendwithpennies.com':'Spend With Pennies'};
+function srcName(u){ try { const h = new URL(u).hostname.replace(/^www\./,''); return 'the original recipe on '+(SRC_NAMES[h]||h); } catch(e){ return 'the original recipe'; } }
 
 function mealCard(date,key){
   const G = groups(date,key), m = G.meal, persons = KEY_PERSONS[key], fam = key==='d', r = S.ratings[G.id]||0;
@@ -692,7 +696,7 @@ function mealCard(date,key){
       ${help?`<div class="cookhelp">${help}</div>`:''}
       <div class="tblwrap"><table class="ing"><tr><td class="muted small">Ingredients${live.length>1?` (${live.length} days)`:''}</td><td class="n muted small">About</td></tr>${ing}</table></div>
       <div class="eyebrow" style="margin-top:12px">Method · amounts are for the whole batch</div><ol class="steps">${m.steps.map(s=>`<li>${stepTxt(s)}</li>`).join('')}</ol>
-      ${fam?`<p class="note" style="margin:10px 0 0">Sample recipe. Real plans link the original here, like Spend With Pennies, with amounts rescaled for your macros.</p>`:''}
+      ${m.src?`<p class="note" style="margin:10px 0 0">Based on <a href="${esc(m.src)}" target="_blank" rel="noopener">${esc(srcName(m.src))}</a>, with amounts rescaled for your macros.</p>`:''}
       ${fam?`<div style="margin-top:10px"><button class="btn" data-act="openMove" data-date="${date}">${'Move this dinner'}</button></div>`:''}
     </details>
   </article>`;
