@@ -343,6 +343,7 @@ function boot(){
   setSync('Loading…');
   if(!S) document.getElementById('view').innerHTML = '<div class="signin"><p class="muted">Loading your plan…</p></div>';
   return api('load').then(j=>{
+    if(!j.data) throw new Error('Unexpected reply from the sheet: '+JSON.stringify(j).slice(0,200));
     USER = j.user; FOODS = j.foods || {}; MEALS = j.recipes || {};
     Object.values(MEALS).forEach(m=>{ m.spices = Object.keys(m.season||{}); });
     S = {};
