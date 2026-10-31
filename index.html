@@ -261,6 +261,8 @@ const I = {
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
 let FOODS = {}, MEALS = {};
+// Freezer tab keys that differ from Foods keys.
+const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat'};
 const GLASS = {
   red:['Red wine glass','<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h10l-.4 5.5a4.6 4.6 0 0 1-9.2 0z"/><path d="M7.5 7.5h9a4.6 4.6 0 0 1-9 0z" fill="currentColor" stroke="none"/><path d="M12 13v7M8.5 21h7"/></svg>'],
   white:['White wine glass','<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 2.5h7l-.3 6.5a3.2 3.2 0 0 1-6.4 0z"/><path d="M8.8 7h6.4l-.1 2a3.2 3.2 0 0 1-6.2 0z" fill="currentColor" stroke="none" opacity=".45"/><path d="M12 12.2V20M8.5 21h7"/></svg>'],
@@ -268,7 +270,7 @@ const GLASS = {
   rocks:['Rocks glass','<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M5 8h14l-1.3 12H6.3z"/><path d="M6 14h12l-.6 5.3H6.6z" fill="currentColor" stroke="none" opacity=".55"/></svg>'],
   highball:['Highball glass','<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M7.5 3h9v18h-9z"/><path d="M7.5 9h9v12h-9z" fill="currentColor" stroke="none" opacity=".5"/></svg>']
 };
-const SPICE_N = {salt:'Salt',pepper:'Black pepper',garlic:'Garlic powder',onion:'Onion powder',paprika:'Paprika',italian:'Italian seasoning',chili:'Chili powder',cumin:'Cumin',oregano:'Oregano',soy:'Soy sauce',ginger:'Ginger paste',oil:'Olive oil',cinnamon:'Cinnamon'};
+const SPICE_N = {salt:'Salt',pepper:'Black pepper',garlic:'Garlic powder',onion:'Onion powder',paprika:'Paprika',italian:'Italian seasoning',chili:'Chili powder',cumin:'Cumin',oregano:'Oregano',soy:'Soy sauce',ginger:'Ginger paste',oil:'Olive oil',cinnamon:'Cinnamon',thyme:'Dried thyme'};
 function spiceAmt(amt,unit,lb){
   let n = amt*lb, u = unit;
   if(u==='tsp' && n>=3){ n /= 3; u = 'tbsp'; }
@@ -355,7 +357,7 @@ function boot(){
     SYNC_KEYS.forEach(k=>{ SNAP[k] = JSON.stringify(S[k]); });
     if(!j.data.plan) SNAP.plan = JSON.stringify(S.plan);
     PANTRY = j.pantry || []; PANTRY.forEach(r=>{ PSNAP[r.row] = r.left; });
-    S.freezer = (j.freezer||[]).map(r=>Object.assign({}, r, {food:r.key})); FSNAP = JSON.stringify(S.freezer.map(fzOut));
+    S.freezer = (j.freezer||[]).map(r=>Object.assign({}, r, {food:FZ_FOOD[r.key]||r.key})); FSNAP = JSON.stringify(S.freezer.map(fzOut));
     S.requests = j.requests || [];
     S.flag = {pending: j.status['Changes waiting']===true, at:j.status['Last change'], tab:j.status['Changed tab']};
     rebuildSpices();
@@ -408,7 +410,7 @@ function applyTallow(){
     m.steps = m._steps.map(t=>{ outs.forEach(f=>{ const fb = FOODS[f].fallback; t = t.split('melted '+FOODS[f].n.toLowerCase()+' {f:'+f+'}').join(FOODS[fb].n.toLowerCase()+' {f:'+fb+'}').split('{f:'+f+'}').join('{f:'+fb+'}'); }); return t; });
   });
 }
-const G_PER_TSP = {salt:6, pepper:2.3, garlic:3, onion:2.5, paprika:2.3, italian:1, chili:2.7, cumin:2.1, oregano:1, soy:5.3, ginger:5, oil:4.5, cinnamon:2.6};
+const G_PER_TSP = {salt:6, pepper:2.3, garlic:3, onion:2.5, paprika:2.3, italian:1, chili:2.7, cumin:2.1, oregano:1, soy:5.3, ginger:5, oil:4.5, cinnamon:2.6, thyme:1};
 // Grams of each seasoning or staple the week's recipes use (each batch counted once).
 function spiceNeeds(start,end){
   const g = {}, seen = new Set();
@@ -451,10 +453,12 @@ function dayMacros(date,p){
 const targets = p => { const m = S.macros[p]; return {k:m.kcal, p:m.kcal*m.p/400, c:m.kcal*m.c/400, f:m.kcal*m.f/900}; };
 function getRun(date,key){
   const days = S.plan.days, id = days[date][key], cyc = days[date].cyc;
-  const same = d => days[d] && days[d][key]===id && days[d].cyc===cyc;
+  // A slot listed in a day's "carry" continues the previous day's batch even across a prep day.
+  const carries = d => ((days[d]||{}).carry||[]).includes(key);
+  const link = (x,y) => days[x] && days[y] && days[x][key]===id && days[y][key]===id && (days[x].cyc===days[y].cyc || carries(y));
   let a = date, b = date;
-  while(same(add(a,-1))) a = add(a,-1);
-  while(same(add(b,1))) b = add(b,1);
+  while(link(add(a,-1),a)) a = add(a,-1);
+  while(link(b,add(b,1))) b = add(b,1);
   const out = []; for(let d=a; d<=b; d=add(d,1)) out.push(d); return out;
 }
 function groups(date,key){
@@ -501,7 +505,7 @@ function eyeball(g, v){
 }
 const cycleOf = date => S.plan.days[date] ? S.plan.days[date].cyc : -1;
 function onHand(food){ return S.freezer.filter(x=>x.food===food).reduce((a,x)=>a+x.lb,0)*454; }
-function cycleNeeds(ci){ const c = S.plan.cycles[ci]; return needsRange(c.start, c.end); }
+function cycleNeeds(ci){ const c = S.plan.cycles[ci]; return needsRange(c.start, c.end, false, true); }
 function shopWeeks(){
   const st = [], out = [], mv = S.shopMoves||{};
   for(let d=add(S.plan.start,-6); d<=S.plan.end; d=add(d,1)) if(dow(d)===S.settings.shopDay) st.push({orig:d, start:mv[d]||d});
@@ -523,6 +527,7 @@ function isDrinkNight(d){
 }
 const weekOf = date => shopWeeks().find(w=>date>=w.start && date<=w.end);
 const isLocked = date => { const w = weekOf(date); return !!(w && (S.locked||{})[w.start]); };
+const isCarry = (date,key) => (((S.plan.days[date]||{}).carry)||[]).includes(key);
 const isSkipped = (date,key) => !!(S.skipped||{})[date+'|'+key];
 function pushBack(w){
   const days = S.plan.days, X = w.start;
@@ -550,13 +555,17 @@ function pullForward(w){
 // A shopping week runs from the shop day's dinner to the next shop day's lunch (pickup is midday).
 // Produce used from day 4 on goes on a lighter midweek trip so it stays fresh.
 const MORNING = ['kb','yb','l'];
-function needsRange(start,end,shopWeek){
+function needsRange(start,end,shopWeek,noCarry){
   const need = {}, late = {}, spices = new Set(), meals = new Set();
   const last = shopWeek ? add(end,1) : end, mid = add(start,3);
-  for(let d=start; d<=last; d=add(d,1)){
+  // For a prep cycle (noCarry): carried slots count toward the cycle where their batch was cooked.
+  let stop = last; if(noCarry) for(let d=add(end,1); S.plan.days[d] && Object.keys(KEY_PERSONS).some(k=>isCarry(d,k)); d=add(d,1)) stop = d;
+  for(let d=start; d<=stop; d=add(d,1)){
     const day = S.plan.days[d]; if(!day) continue;
     Object.keys(KEY_PERSONS).forEach(k=>{
       if(isFlex(d,k)) return;
+      if(noCarry && isCarry(d,k) && getRun(d,k)[0] < start) return;
+      if(noCarry && d>end && !(isCarry(d,k) && getRun(d,k)[0] <= end)) return;
       if(shopWeek && d===start && MORNING.includes(k)) return;
       if(shopWeek && d===last && !MORNING.includes(k)) return;
       const m = MEALS[day[k]]; meals.add(day[k]); (m.spices||[]).forEach(s=>spices.add(s));
@@ -590,7 +599,8 @@ const HH = {
   saladveg:[120,'cup chopped','cups chopped',.5], arugula:[20,'cup','cups',.5], blueberries:[148,'cup','cups',.25], apple:[180,'apple','apples',.5],
   avocado:[140,'avocado','avocados',.25], eggs:[50,'egg','eggs',1], yogurt:[245,'cup','cups',.25], cottage:[226,'cup','cups',.25], cheddar:[113,'cup','cups',.25],
   feta:[150,'cup','cups',.25], creamer:[15,'tbsp','tbsp',.5], wholemilk:[244,'cup','cups',.25], tallow:[13,'tbsp','tbsp',.5], milk:[244,'cup','cups',.25], banana:[118,'banana','bananas',.5], peanutbutter:[16,'tbsp','tbsp',.5], sourdough:[50,'slice','slices',.5], tsausage:[454,'lb','lb',1,true], bacon:[14,'slice','slices',1], hashbrowns:[80,'cup','cups',.5],
-  tortilla:[45,'tortilla','tortillas',1], emuffin:[57,'English muffin','English muffins',1], chia:[12,'tbsp','tbsp',.5], strawberries:[150,'cup sliced','cups sliced',.25]
+  tortilla:[45,'tortilla','tortillas',1], emuffin:[57,'English muffin','English muffins',1], chia:[12,'tbsp','tbsp',.5], strawberries:[150,'cup sliced','cups sliced',.25],
+  stewmeat:[454,'lb','lb',1,true], carrots:[61,'medium carrot','medium carrots',.5], onion:[110,'medium onion','medium onions',.5], broth:[240,'cup','cups',.25], mixedveg:[134,'cup','cups',.25], butter:[14,'tbsp','tbsp',.5]
 };
 function frac(n){ const w = Math.floor(n), r = Math.round((n-w)*4)/4, f = {0:'',.25:'¼',.5:'½',.75:'¾',1:''}[r]; const W = r===1 ? w+1 : w; return (W||(f?'':'0'))+(W&&f?' ':'')+f; }
 function household(food,g){
@@ -657,7 +667,7 @@ function srcName(u){ try { const h = new URL(u).hostname.replace(/^www\./,''); r
 
 function mealCard(date,key){
   const G = groups(date,key), m = G.meal, persons = KEY_PERSONS[key], fam = key==='d', r = S.ratings[G.id]||0;
-  const run = G.run, idx = run.indexOf(date), cyc = S.plan.cycles[cycleOf(date)];
+  const run = G.run, idx = run.indexOf(date), cyc = S.plan.cycles[cycleOf(run[0])];
   const who = fam ? `<div class="who" style="--pc:var(--accent)">Family dinner</div>` : key==='l' ? `<div class="who" style="--pc:var(--accent)">Shared lunch · Kaleb & Kayla</div>` : key==='c' ? `<div class="who" style="--pc:var(--accent)">Both of you · every morning</div>` : `<div class="who" style="--pc:${PC[persons[0]]}"><span class="pdot"></span>${NAMES[persons[0]]}</div>`;
   const tags = (m.style?`<span class="tag style" style="--sc:${STYLE_COLOR[m.style]}">${m.style}</span>`:'')+`<span class="tag">${m.tool}</span>`+(run.length>1&&key!=='c'?`<span class="tag">Day ${idx+1} of ${run.length}</span>`:'');
   const vis = eaters(date,key).filter(shows);
@@ -709,7 +719,7 @@ function vDay(){
   const head = `<div class="dayhead"><button class="iconbtn" data-act="dnav" data-dir="-1" aria-label="Previous day">${I.left}</button><h2>${nice(d)}</h2><button class="iconbtn" data-act="dnav" data-dir="1" aria-label="Next day">${I.right}</button></div>`;
   if(!day) return head + '<div class="card muted">No plan for this day yet.</div>';
   const mk = markers(d); let banners = '';
-  if(mk.prep){ const c = S.plan.cycles[cycleOf(d)], ms = new Set(); for(let x=c.start;x<=c.end;x=add(x,1)) Object.keys(KEY_SLOT).forEach(k=>{ if(isFlex(x,k)) return; const mm = MEALS[S.plan.days[x][k]]; if(mm.tool!=='No cook' && mm.tool!=='Make day-of') ms.add(mm.n); }); banners += `<div class="banner prep">${I.pot}<div><b>Prep day</b>Cook: ${[...ms].map(esc).join(', ')}.</div></div>`; }
+  if(mk.prep){ const c = S.plan.cycles[cycleOf(d)], ms = new Set(); for(let x=c.start;x<=c.end;x=add(x,1)) Object.keys(KEY_SLOT).forEach(k=>{ if(isFlex(x,k) || isCarry(x,k)) return; const mm = MEALS[S.plan.days[x][k]]; if(mm.tool!=='No cook' && mm.tool!=='Make day-of') ms.add(mm.n); }); banners += `<div class="banner prep">${I.pot}<div><b>Prep day</b>Cook: ${[...ms].map(esc).join(', ')}.</div></div>`; }
   if(mk.thaw){ const nc = S.plan.cycles[mk.next]; banners += `<div class="banner thaw">${I.snow}<div><b>Move to the fridge tonight</b>${thawList(mk.next).map(t=>`${esc(FOODS[t.f].n)} ${t.lb} lb`).join(' · ')} <span class="small muted">for ${nice(nc.start)} prep</span></div></div>`; }
   if(mk.shop && mk.week>=0){ const w = shopWeeks()[mk.week]; banners += `<div class="banner shop">${I.cart}<div><b>Shopping day · covers ${nice(w.start)} – ${nice(w.end)}</b><button class="linkbtn" data-act="goList" data-ci="${mk.week}">See the list</button></div></div>`; }
   const flexCard = k => `<article class="meal" style="border-style:dashed"><div class="mtop"><div class="mtitle">${k==='d'||k==='l'?`<div class="who" style="--pc:var(--accent)">${k==='d'?'Family dinner':'Shared lunch'}</div>`:`<div class="who" style="--pc:${PC[KEY_PERSONS[k][0]]}"><span class="pdot"></span>${NAMES[KEY_PERSONS[k][0]]}</div>`}<h3>${k==='ys'?'Nothing planned':!eaters(d,k).length?'Away':S.plan.days[d].off?'Open':'Flex'}</h3><div class="note">${k==='ys'?'Snacks are off for now.':!eaters(d,k).length?`${NAMES[KEY_PERSONS[k][0]]} is away today. Nothing planned.`:S.plan.days[d].off?'Plan pushed back a day. Use leftovers or eat out.':'Eat leftovers from the week first, then whatever fits the day.'}</div></div></div></article>`;
