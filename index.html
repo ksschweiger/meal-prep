@@ -717,11 +717,11 @@ function mealCard(date,key){
 function vDay(){
   const d = ui.sel, day = S.plan.days[d];
   const head = `<div class="dayhead"><button class="iconbtn" data-act="dnav" data-dir="-1" aria-label="Previous day">${I.left}</button><h2>${nice(d)}</h2><button class="iconbtn" data-act="dnav" data-dir="1" aria-label="Next day">${I.right}</button></div>`;
-  if(!day) return head + '<div class="card muted">No plan for this day yet.</div>';
   const mk = markers(d); let banners = '';
   if(mk.prep){ const c = S.plan.cycles[cycleOf(d)], ms = new Set(); for(let x=c.start;x<=c.end;x=add(x,1)) Object.keys(KEY_SLOT).forEach(k=>{ if(isFlex(x,k) || isCarry(x,k)) return; const mm = MEALS[S.plan.days[x][k]]; if(mm.tool!=='No cook' && mm.tool!=='Make day-of') ms.add(mm.n); }); banners += `<div class="banner prep">${I.pot}<div><b>Prep day</b>Cook: ${[...ms].map(esc).join(', ')}.</div></div>`; }
   if(mk.thaw){ const nc = S.plan.cycles[mk.next]; banners += `<div class="banner thaw">${I.snow}<div><b>Move to the fridge tonight</b>${thawList(mk.next).map(t=>`${esc(FOODS[t.f].n)} ${t.lb} lb`).join(' · ')} <span class="small muted">for ${nice(nc.start)} prep</span></div></div>`; }
   if(mk.shop && mk.week>=0){ const w = shopWeeks()[mk.week]; banners += `<div class="banner shop">${I.cart}<div><b>Shopping day · covers ${nice(w.start)} – ${nice(w.end)}</b><button class="linkbtn" data-act="goList" data-ci="${mk.week}">See the list</button></div></div>`; }
+  if(!day) return head + banners + '<div class="card muted">No meals planned for this day.</div>';
   const flexCard = k => `<article class="meal" style="border-style:dashed"><div class="mtop"><div class="mtitle">${k==='d'||k==='l'?`<div class="who" style="--pc:var(--accent)">${k==='d'?'Family dinner':'Shared lunch'}</div>`:`<div class="who" style="--pc:${PC[KEY_PERSONS[k][0]]}"><span class="pdot"></span>${NAMES[KEY_PERSONS[k][0]]}</div>`}<h3>${k==='ys'?'Nothing planned':!eaters(d,k).length?'Away':S.plan.days[d].off?'Open':'Flex'}</h3><div class="note">${k==='ys'?'Snacks are off for now.':!eaters(d,k).length?`${NAMES[KEY_PERSONS[k][0]]} is away today. Nothing planned.`:S.plan.days[d].off?'Plan pushed back a day. Use leftovers or eat out.':'Eat leftovers from the week first, then whatever fits the day.'}</div></div></div></article>`;
   const mp = {id:day.d}, drink = isDrinkNight(d) ? (()=>{ const x = MEALS[mp.id].pair; return `<button class="drinkcard" data-act="drink" data-id="${mp.id}"><span class="b drink" style="width:28px;height:28px;border-radius:8px">${GLASS[x.glass][1]}</span><span class="grow1"><b>${esc(x.n)}</b> <span class="small muted">· ${x.kind} pairing</span></span><span class="small" style="color:var(--accent);font-weight:700">Recipe ›</span></button>`; })() : '';
   const slot = (label,keys) => { keys = keys.filter(k=>KEY_PERSONS[k].some(shows)); if(!keys.length) return ''; return `<section class="slot"><div class="eyebrow">${label}</div>${keys.map(k=>isFlex(d,k)?flexCard(k):mealCard(d,k)).join('')}${keys.includes('d')?drink:''}</section>`; };
@@ -931,7 +931,7 @@ document.addEventListener('click', e=>{
   if(['cooked','mac','macg','budget','store','check','drinkon','prof','spoz','receipt','fzpri'].includes(a)) return;
   if(a==='tab'){ ui.tab = t.dataset.tab; render(); window.scrollTo(0,0); }
   else if(a==='mon'){ let [y,m] = ui.ym; m += +t.dataset.dir; if(m<0){m=11;y--} if(m>11){m=0;y++} ui.ym = [y,m]; render(); }
-  else if(a==='pick'){ if(!S.plan.days[t.dataset.date]) return; ui.sel = t.dataset.date; ui.tab = 'day'; render(); window.scrollTo(0,0); }
+  else if(a==='pick'){ const pm = markers(t.dataset.date); if(!S.plan.days[t.dataset.date] && !pm.thaw && !pm.shop) return; ui.sel = t.dataset.date; ui.tab = 'day'; render(); window.scrollTo(0,0); }
   else if(a==='dnav'){ const n = add(ui.sel, +t.dataset.dir); if(S.plan.days[n]){ ui.sel = n; render(); } }
   else if(a==='gnav'){ ui.gc = Math.max(0, Math.min(shopWeeks().length-1, ui.gc + +t.dataset.dir)); render(); }
   else if(a==='weekend'){ S.settings.weekend = t.dataset.v; changed('Settings'); render(); }
