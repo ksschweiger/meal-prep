@@ -487,6 +487,8 @@ function groups(date,key){
 function fmtPortion(g,p){
   const v = g.per[p];
   if(g.scoop) return (Math.round(v/31*2)/2||.5)+' scoop';
+  // Once the real cooked weight is entered (in grams), give each person's share in cooked grams.
+  if(g.cooks && g.actual) return Math.round(v)+' g';
   if(g.each){ const f = FOODS[g.each], n = g.each==='eggs' ? Math.max(1, Math.round(v/f.each)) : Math.max(.5, Math.round(v/f.each*2)/2), w = Math.floor(n), h = n-w ? '½' : ''; return (w||'')+h+' '+(n>1?f.unit[1]:f.unit[0]); }
   return eyeball(g, v);
 }
@@ -675,7 +677,7 @@ function mealCard(date,key){
   const rows = G.list.map(g=> g.cooks || g.each || g.scoop
     ? `<div class="grow"><span class="gname">${esc(g.name)}</span><span class="tapes">${vis.map(p=>tape(p,fmtPortion(g,p))).join('')}</span></div>`
     : g.comps.map(c=>`<div class="grow"><span class="gname">${esc(FOODS[c[0]].n)}</span><span class="tapes">${vis.filter(p=>cg(c,p)>0).map(p=>tape(p,household(c[0],raw(date,p,c)))).join('')}</span></div>`).join('')).join('');
-  const cookedNote = G.list.some(g=>g.cooks) ? `<div class="note">Eyeball amounts for cooked food. Exact grams are in the recipe. Cooked ${nice(cyc.start)}${idx>0||run[0]!==cyc.start?' · leftovers':''}.</div>` : '';
+  const cookedNote = G.list.some(g=>g.cooks) ? `<div class="note">${G.list.some(g=>g.cooks&&g.actual)?'Cooked grams per person, from the cooked weight you entered':'Eyeball amounts for cooked food. Enter the cooked weight under Recipe to get grams per person'}. Cooked ${nice(cyc.start)}${idx>0||run[0]!==cyc.start?' · leftovers':''}.</div>` : '';
   // ingredients (raw, per person today)
   const live = G.run.filter(d=>!isFlex(d,key));
   const tot = {}; m.comps.forEach(c=>{ tot[c[0]] = (tot[c[0]]||0) + live.reduce((a,d)=>a+eaters(d,key).reduce((b,p)=>b+raw(d,p,c),0),0); });
