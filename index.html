@@ -1042,6 +1042,15 @@ function cartSheet(ci){
     <button class="btn primary block" data-act="copylist">Copy list</button>`;
 }
 
+// Reload from the sheet when the app comes back to the screen, so each phone sees the other's
+// changes (and Claude's). Skipped while this phone still has unsaved edits.
+let lastLoad = Date.now();
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState!=='visible' || !S || !TOKEN || Date.now()-lastLoad < 30e3) return;
+  const dirty = SYNC_KEYS.some(k=>JSON.stringify(S[k])!==SNAP[k]);
+  if(dirty) return;
+  lastLoad = Date.now(); boot();
+});
 start();
 </script>
 </body>
