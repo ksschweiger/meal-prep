@@ -271,7 +271,12 @@ const GLASS = {
   highball:['Highball glass','<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M7.5 3h9v18h-9z"/><path d="M7.5 9h9v12h-9z" fill="currentColor" stroke="none" opacity=".5"/></svg>']
 };
 const SPICE_N = {salt:'Salt',pepper:'Black pepper',garlic:'Garlic powder',onion:'Onion powder',paprika:'Paprika',italian:'Italian seasoning',chili:'Chili powder',cumin:'Cumin',oregano:'Oregano',soy:'Soy sauce',ginger:'Ginger paste',oil:'Olive oil',cinnamon:'Cinnamon',thyme:'Dried thyme'};
-function spiceAmt(amt,unit,lb){
+// Seasonings by weight for the scale, with the spoon measure as a backup (small amounts are hard to weigh).
+function spiceAmt(amt,unit,lb,sid){
+  const g = amt*lb*(unit==='tbsp'?3:unit==='cup'?48:1)*(G_PER_TSP[sid]||2.5);
+  return wt(g)+' ('+spoonAmt(amt,unit,lb)+')';
+}
+function spoonAmt(amt,unit,lb){
   let n = amt*lb, u = unit;
   if(u==='tsp' && n>=3){ n /= 3; u = 'tbsp'; }
   if(u==='tbsp' && n>=4){ n /= 16; u = 'cup'; }
@@ -487,23 +492,10 @@ function groups(date,key){
 function fmtPortion(g,p){
   const v = g.per[p];
   if(g.scoop) return (Math.round(v/31*2)/2||.5)+' scoop';
-  // Once the real cooked weight is entered (in grams), give each person's share in cooked grams.
-  if(g.cooks && g.actual) return Math.round(v)+' g';
+  // Cooked food: grams per person, from the real cooked weight once entered, else from the expected yield.
+  if(g.cooks) return (g.actual?'':'about ')+wt(v);
   if(g.each){ const f = FOODS[g.each], n = g.each==='eggs' ? Math.max(1, Math.round(v/f.each)) : Math.max(.5, Math.round(v/f.each*2)/2), w = Math.floor(n), h = n-w ? '½' : ''; return (w||'')+h+' '+(n>1?f.unit[1]:f.unit[0]); }
-  return eyeball(g, v);
-}
-// Loose, no-scale portions for cooked food. Exact grams stay in the recipe.
-const SAUCY = ['marinara','tomatoes','stirsauce','blackbeans'];
-const CUP_G = {beef:135, turkey:135, venison:135, tsausage:135, rice:160, pasta:140, redpot:140, sweetpot:140, hashbrowns:120, broccoli:120, greenbeans:120, stirveg:130};
-function eyeball(g, v){
-  const foods = g.comps.map(c=>c[0]), main = foods[0];
-  const q4 = n => Math.max(.25, Math.round(n*4)/4);
-  if(['chicken','sirloin'].includes(main) && !foods.some(f=>SAUCY.includes(f) || f==='stirveg' || f==='broccoli')){
-    const n = Math.max(.5, Math.round(v/100*2)/2); return 'about '+frac(n)+' palm-size '+(n>1?'pieces':'piece');
-  }
-  if(main==='bacon'){ const n = Math.max(1, Math.round(v/10)); return n+' slices'; }
-  const per = foods.some(f=>SAUCY.includes(f)) ? 230 : foods.length>1 && ['sirloin','chicken'].includes(main) ? 170 : (CUP_G[main]||150);
-  const n = q4(v/per); return 'about '+frac(n)+(n>1?' cups':' cup');
+  return wt(v);
 }
 const cycleOf = date => S.plan.days[date] ? S.plan.days[date].cyc : -1;
 function onHand(food){ return S.freezer.filter(x=>x.food===food).reduce((a,x)=>a+x.lb,0)*454; }
@@ -605,7 +597,19 @@ const HH = {
   stewmeat:[454,'lb','lb',1,true], carrots:[61,'medium carrot','medium carrots',.5], onion:[110,'medium onion','medium onions',.5], broth:[240,'cup','cups',.25], mixedveg:[134,'cup','cups',.25], butter:[14,'tbsp','tbsp',.5]
 };
 function frac(n){ const w = Math.floor(n), r = Math.round((n-w)*4)/4, f = {0:'',.25:'¼',.5:'½',.75:'¾',1:''}[r]; const W = r===1 ? w+1 : w; return (W||(f?'':'0'))+(W&&f?' ':'')+f; }
+// Scale-first amounts: grams, plus ounces once it's an ounce or more.
+function wt(g){
+  if(g < 10) return (Math.round(g*2)/2)+' g';
+  const r = g >= 100 ? Math.round(g/5)*5 : Math.round(g);
+  return r+' g'+(g >= 28 ? ' ('+(g/28.35).toFixed(1).replace(/\.0$/,'')+' oz)' : '');
+}
+// Items you count rather than weigh keep their count, with the weight alongside.
+const COUNTED = ['eggs','tortilla','emuffin'];
 function household(food,g){
+  if(COUNTED.includes(food) && HH[food]) return kitchenAmt(food,g)+' · '+wt(g);
+  return wt(g);
+}
+function kitchenAmt(food,g){
   const h = HH[food]; if(!h) return Math.round(g)+' g';
   if(food==='granola'){ const c = g/110; return frac(Math.max(.25, Math.round(c*4)/4))+(c>1.1?' cups':' cup'); }
   let n = g/h[0];
@@ -677,13 +681,13 @@ function mealCard(date,key){
   const rows = G.list.map(g=> g.cooks || g.each || g.scoop
     ? `<div class="grow"><span class="gname">${esc(g.name)}</span><span class="tapes">${vis.map(p=>tape(p,fmtPortion(g,p))).join('')}</span></div>`
     : g.comps.map(c=>`<div class="grow"><span class="gname">${esc(FOODS[c[0]].n)}</span><span class="tapes">${vis.filter(p=>cg(c,p)>0).map(p=>tape(p,household(c[0],raw(date,p,c)))).join('')}</span></div>`).join('')).join('');
-  const cookedNote = G.list.some(g=>g.cooks) ? `<div class="note">${G.list.some(g=>g.cooks&&g.actual)?'Cooked grams per person, from the cooked weight you entered':'Eyeball amounts for cooked food. Enter the cooked weight under Recipe to get grams per person'}. Cooked ${nice(cyc.start)}${idx>0||run[0]!==cyc.start?' · leftovers':''}.</div>` : '';
+  const cookedNote = G.list.some(g=>g.cooks) ? `<div class="note">${G.list.some(g=>g.cooks&&g.actual)?'Cooked grams per person, from the cooked weight you entered':'Cooked grams per person, estimated. Weigh the whole batch and enter it under Recipe for exact portions'}. Cooked ${nice(cyc.start)}${idx>0||run[0]!==cyc.start?' · leftovers':''}.</div>` : '';
   // ingredients (raw, per person today)
   const live = G.run.filter(d=>!isFlex(d,key));
   const tot = {}; m.comps.forEach(c=>{ tot[c[0]] = (tot[c[0]]||0) + live.reduce((a,d)=>a+eaters(d,key).reduce((b,p)=>b+raw(d,p,c),0),0); });
   const lb = (tot[m.comps[0][0]]||0)/454, sea = m.season||{};
-  const ing = Object.keys(tot).map(f=>`<tr><td>${esc(FOODS[f].n)}</td><td class="n">${household(f,tot[f])}</td></tr>`).join('') + Object.keys(sea).map(k=>`<tr><td>${esc(SPICE_N[k]||k)}</td><td class="n">${spiceAmt(sea[k][0],sea[k][1],lb)}</td></tr>`).join('');
-  const stepTxt = st => esc(st).replace(/\{f:(\w+)\}/g,(x,f)=>`<b class="q">(${household(f,tot[f]||0)})</b>`).replace(/\{s:(\w+)\}/g,(x,k)=>sea[k]?`<b class="q">(${spiceAmt(sea[k][0],sea[k][1],lb)})</b>`:'');
+  const ing = Object.keys(tot).map(f=>`<tr><td>${esc(FOODS[f].n)}</td><td class="n">${household(f,tot[f])}</td></tr>`).join('') + Object.keys(sea).map(k=>`<tr><td>${esc(SPICE_N[k]||k)}</td><td class="n">${spiceAmt(sea[k][0],sea[k][1],lb,k)}</td></tr>`).join('');
+  const stepTxt = st => esc(st).replace(/\{f:(\w+)\}/g,(x,f)=>`<b class="q">(${household(f,tot[f]||0)})</b>`).replace(/\{s:(\w+)\}/g,(x,k)=>sea[k]?`<b class="q">(${spiceAmt(sea[k][0],sea[k][1],lb,k)})</b>`:'');
   const help = G.list.filter(g=>g.cooks).map(g=>{
     const meat = g.comps.filter(c=>FOODS[c[0]].cat==='Meat').map(c=>{ const t = G.run.filter(d=>!isFlex(d,key)).reduce((a,d)=>a+eaters(d,key).reduce((b,p)=>b+raw(d,p,c),0),0); return `${FOODS[c[0]].n}: ${Math.round(t)} g raw → ${Math.max(1,Math.ceil(t/454-.05))} lb`; }).join('; ');
     return `<div class="ch"><span class="t">${esc(g.name)}</span><input class="numin" inputmode="numeric" id="ck-${esc(G.runId+'-'+g.name).replace(/[^a-z0-9]/gi,'_')}" data-act="cooked" data-run="${esc(G.runId)}" data-grp="${esc(g.name)}" placeholder="${Math.round(g.exp)}" value="${g.actual||''}" aria-label="Cooked weight of ${esc(g.name)} in grams"><span class="s">Whole batch: ${Math.round(g.batchRaw)} g raw → about ${Math.round(g.exp)} g cooked. Enter the real cooked weight.${meat?'<br>'+meat:''}</span></div>`;
