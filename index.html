@@ -367,8 +367,8 @@ function boot(){
     S.requests = j.requests || [];
     S.flag = {pending: j.status['Changes waiting']===true, at:j.status['Last change'], tab:j.status['Changed tab']};
     rebuildSpices();
-    let v = {}; try{ v = JSON.parse(lsGet('mp-view')||'{}'); }catch(e){}
-    S.view = {me:USER.person||'K', mode:v.mode||'mine'};
+    let v = {}; try{ v = JSON.parse(lsGet('mp-view2')||'{}'); }catch(e){}
+    S.view = {me:USER.person||'K', mode:v.mode||'both'};
     if(!S.plan.days[ui.sel]) ui.sel = S.plan.days[TODAY] ? TODAY : (Object.keys(S.plan.days).sort().find(d=>d>=TODAY) || TODAY);
     setSync('');
     render();
@@ -437,7 +437,7 @@ const eaters = (d,k) => { const a = (S.plan.days[d]||{}).away||[]; return KEY_PE
 const isAway = (d,p) => ((S.plan.days[d]||{}).away||[]).includes(p);
 function isFlex(d,k){ if(k==='ys') return true; if(!eaters(d,k).length) return true; if(((S.plan.days[d]||{}).flex||[]).includes(k)) return true; if(k==='c') return false; if(S.plan.days[d] && S.plan.days[d].off) return true; if(!isWeekend(d)) return false; const m = S.settings.weekend; return m==='none' || (m==='light' && k!=='d'); }
 
-const ui = {macOpen:{}, mealOpen:{}, tab:'calendar', sel:TODAY, ym:[pd(TODAY).getFullYear(), pd(TODAY).getMonth()], gc:null, ptab:'freezer'};
+const ui = {macOpen:{K:true,Y:true}, mealOpen:{}, tab:'calendar', sel:TODAY, ym:[pd(TODAY).getFullYear(), pd(TODAY).getMonth()], gc:null, ptab:'freezer'};
 
 // ---------- Math ----------
 const cg = (c,p) => p==='K' ? c[1] : p==='Y' ? c[2] : c[2]*S.settings.landen/100;
@@ -957,7 +957,7 @@ document.addEventListener('click', e=>{
     if(autoMacros(t.dataset.p)){ changed('Macros'); toast(`Targets updated for ${NAMES[t.dataset.p]}.`); } else { save(); toast('Enter a weight to fill in the targets.'); } render(); }
   else if(a==='mopen'){ ui.mealOpen[t.dataset.k] = !ui.mealOpen[t.dataset.k]; const sc = window.scrollY; render(); window.scrollTo(0,sc); }
   else if(a==='haveit'){ S.haveIt = S.haveIt||{}; S.haveIt[t.dataset.k] = !S.haveIt[t.dataset.k]; changed('Groceries'); render(); }
-  else if(a==='vmode'){ S.view.mode = t.dataset.v; lsSet('mp-view', JSON.stringify({mode:S.view.mode})); render(); }
+  else if(a==='vmode'){ S.view.mode = t.dataset.v; lsSet('mp-view2', JSON.stringify({mode:S.view.mode})); render(); }
   else if(a==='macopen'){ ui.macOpen[t.dataset.p] = !ui.macOpen[t.dataset.p]; render(); }
   else if(a==='drink'){ showDrink(t.dataset.id); }
   else if(a==='swap'){ swap(t.dataset.date, t.dataset.key); }
