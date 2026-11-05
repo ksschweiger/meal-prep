@@ -157,6 +157,7 @@ details.more[open] summary::after{content:" −";}
 .tblwrap{overflow-x:auto}
 ol.steps .q{color:var(--accent);font-weight:700;white-space:nowrap}
 ol.steps{margin:10px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.tare{font-size:13.5px;background:color-mix(in srgb,var(--accent) 12%,transparent);border-left:3px solid var(--accent);border-radius:6px;padding:8px 10px}
 .cookhelp{margin-top:10px;background:var(--sunk);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:10px}
 .ch{display:grid;grid-template-columns:1fr auto;gap:4px 10px;align-items:center}
 .ch .t{font-weight:700;font-size:14px}
@@ -690,8 +691,9 @@ function mealCard(date,key){
   const stepTxt = st => esc(st).replace(/\{f:(\w+)\}/g,(x,f)=>`<b class="q">(${household(f,tot[f]||0)})</b>`).replace(/\{s:(\w+)\}/g,(x,k)=>sea[k]?`<b class="q">(${spiceAmt(sea[k][0],sea[k][1],lb,k)})</b>`:'');
   const help = G.list.filter(g=>g.cooks).map(g=>{
     const meat = g.comps.filter(c=>FOODS[c[0]].cat==='Meat').map(c=>{ const t = G.run.filter(d=>!isFlex(d,key)).reduce((a,d)=>a+eaters(d,key).reduce((b,p)=>b+raw(d,p,c),0),0); return `${FOODS[c[0]].n}: ${Math.round(t)} g raw → ${Math.max(1,Math.ceil(t/454-.05))} lb`; }).join('; ');
-    return `<div class="ch"><span class="t">${esc(g.name)}</span><input class="numin" inputmode="numeric" id="ck-${esc(G.runId+'-'+g.name).replace(/[^a-z0-9]/gi,'_')}" data-act="cooked" data-run="${esc(G.runId)}" data-grp="${esc(g.name)}" placeholder="${Math.round(g.exp)}" value="${g.actual||''}" aria-label="Cooked weight of ${esc(g.name)} in grams"><span class="s">Whole batch: ${Math.round(g.batchRaw)} g raw → about ${Math.round(g.exp)} g cooked. Enter the real cooked weight.${meat?'<br>'+meat:''}</span></div>`;
+    return `<div class="ch"><span class="t">${esc(g.name)}</span><input class="numin" inputmode="numeric" id="ck-${esc(G.runId+'-'+g.name).replace(/[^a-z0-9]/gi,'_')}" data-act="cooked" data-run="${esc(G.runId)}" data-grp="${esc(g.name)}" placeholder="${Math.round(g.exp)}" value="${g.actual||''}" aria-label="Cooked weight of ${esc(g.name)} in grams"><span class="s">Whole batch: ${Math.round(g.batchRaw)} g raw → about ${Math.round(g.exp)} g cooked. Enter the real cooked weight, minus the empty pot or container.${meat?'<br>'+meat:''}</span></div>`;
   }).join('');
+  const tareTip = G.list.some(g=>g.cooks) ? `<div class="tare"><b>Before you start:</b> weigh each empty pot, pan or container you'll store the cooked food in and write it down, so you can subtract it when you weigh the finished batch.</div>` : '';
   const okey = date+'|'+key;
   if(!ui.mealOpen[okey] && !isSkipped(date,key)){
     const whoTxt = fam ? 'Family dinner' : key==='l' ? 'Shared lunch' : key==='c' ? 'Every morning' : NAMES[persons[0]];
@@ -709,8 +711,9 @@ function mealCard(date,key){
       </div></div>
     ${isLocked(date)?`<div><button class="btn" style="padding:6px 12px;font-size:13.5px" data-act="skip" data-date="${date}" data-key="${key}">Skip this meal</button></div>`:''}
     <div class="grp">${rows}</div>${cookedNote}
-    ${key!=='c' && persons.length>1 && date===cyc.start && run[0]===cyc.start ? `<div class="cookhelp"><div class="eyebrow" style="color:var(--ink)">Cooking today · whole batch for ${key==='d'?'the family':'both of you'}${live.length>1?`, ${live.length} days`:''}</div><div class="tblwrap"><table class="ing" style="margin:0">${ing}</table></div></div>` : ''}
+    ${key!=='c' && persons.length>1 && date===cyc.start && run[0]===cyc.start ? `<div class="cookhelp"><div class="eyebrow" style="color:var(--ink)">Cooking today · whole batch for ${key==='d'?'the family':'both of you'}${live.length>1?`, ${live.length} days`:''}</div>${tareTip}<div class="tblwrap"><table class="ing" style="margin:0">${ing}</table></div></div>` : ''}
     <details class="more"><summary>Recipe${G.list.some(g=>g.cooks)?' & cooked weights':''}</summary>
+      ${tareTip?`<div style="margin-top:10px">${tareTip}</div>`:''}
       ${help?`<div class="cookhelp">${help}</div>`:''}
       <div class="tblwrap"><table class="ing"><tr><td class="muted small">Ingredients${live.length>1?` (${live.length} days)`:''}</td><td class="n muted small">About</td></tr>${ing}</table></div>
       <div class="eyebrow" style="margin-top:12px">Method · amounts are for the whole batch</div><ol class="steps">${m.steps.map(s=>`<li>${stepTxt(s)}</li>`).join('')}</ol>
