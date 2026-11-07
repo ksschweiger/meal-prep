@@ -435,7 +435,8 @@ const shows = p => S.view.mode==='both' || p===S.view.me || p==='L';
 function isWeekend(d){ const w = dow(d); return w===0 || w===6; }
 const eaters = (d,k) => { const a = (S.plan.days[d]||{}).away||[]; return KEY_PERSONS[k].filter(p=>!a.includes(p)); };
 const isAway = (d,p) => ((S.plan.days[d]||{}).away||[]).includes(p);
-function isFlex(d,k){ if(k==='ys') return true; if(!eaters(d,k).length) return true; if(((S.plan.days[d]||{}).flex||[]).includes(k)) return true; if(k==='c') return false; if(S.plan.days[d] && S.plan.days[d].off) return true; if(!isWeekend(d)) return false; const m = S.settings.weekend; return m==='none' || (m==='light' && k!=='d'); }
+function isFlex(d,k){ if(k==='ys') return true; if(S.plan.days[d] && !MEALS[S.plan.days[d][k]]) return true; // unknown or "none" recipe = nothing planned
+  if(!eaters(d,k).length) return true; if(((S.plan.days[d]||{}).flex||[]).includes(k)) return true; if(k==='c') return false; if(S.plan.days[d] && S.plan.days[d].off) return true; if(!isWeekend(d)) return false; const m = S.settings.weekend; return m==='none' || (m==='light' && k!=='d'); }
 
 const ui = {macOpen:{K:true,Y:true}, mealOpen:{}, tab:'calendar', sel:TODAY, ym:[pd(TODAY).getFullYear(), pd(TODAY).getMonth()], gc:null, ptab:'freezer'};
 
