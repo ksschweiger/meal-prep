@@ -261,6 +261,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
+const APP_VERSION = '2026-11-09a';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat'};
@@ -275,7 +276,7 @@ const SPICE_N = {salt:'Salt',pepper:'Black pepper',garlic:'Garlic powder',onion:
 // Seasonings by weight for the scale, with the spoon measure as a backup (small amounts are hard to weigh).
 function spiceAmt(amt,unit,lb,sid){
   const g = amt*lb*(unit==='tbsp'?3:unit==='cup'?48:1)*(G_PER_TSP[sid]||2.5);
-  return wt(g)+' ('+spoonAmt(amt,unit,lb)+')';
+  return spoonAmt(amt,unit,lb);
 }
 function spoonAmt(amt,unit,lb){
   let n = amt*lb, u = unit;
@@ -495,8 +496,10 @@ function fmtPortion(g,p){
   const v = g.per[p];
   if(g.scoop) return (Math.round(v/31*2)/2||.5)+' scoop';
   // Cooked food: grams per person, from the real cooked weight once entered, else from the expected yield.
-  if(g.cooks) return (g.actual?'':'about ')+wt(v);
+  // Meat (and anything mixed with it) by weight; everything else by volume.
+  if(g.cooks) return g.comps.some(c=>isMeat(c[0])) ? (g.actual?'':'about ')+wt(v) : (COOKED_G_PER_CUP[g.comps[0][0]] || !HH[g.comps[0][0]] ? cupsOf(v, COOKED_G_PER_CUP[g.comps[0][0]]||150) : kitchenAmt(g.comps[0][0], v));
   if(g.each){ const f = FOODS[g.each], n = g.each==='eggs' ? Math.max(1, Math.round(v/f.each)) : Math.max(.5, Math.round(v/f.each*2)/2), w = Math.floor(n), h = n-w ? '½' : ''; return (w||'')+h+' '+(n>1?f.unit[1]:f.unit[0]); }
+  if(g.comps.length===1) return household(g.comps[0][0], v);
   return wt(v);
 }
 const cycleOf = date => S.plan.days[date] ? S.plan.days[date].cyc : -1;
@@ -607,9 +610,13 @@ function wt(g){
 }
 // Items you count rather than weigh keep their count, with the weight alongside.
 const COUNTED = ['eggs','tortilla','emuffin'];
+// Meat is weighed; everything else uses kitchen measures (cups, spoons, counts).
+const isMeat = f => !!FOODS[f] && FOODS[f].cat==='Meat';
+const COOKED_G_PER_CUP = {rice:158, pasta:140, broccoli:156, greenbeans:125, sweetpot:200, redpot:156, saladveg:120, blackbeans:172, stirveg:150, hashbrowns:150, arugula:20};
+function cupsOf(g, per){ const n = Math.max(.25, Math.round(g/per*4)/4); return frac(n)+(n>1?' cups':' cup'); }
 function household(food,g){
-  if(COUNTED.includes(food) && HH[food]) return kitchenAmt(food,g)+' · '+wt(g);
-  return wt(g);
+  if(isMeat(food) || !HH[food]) return wt(g);
+  return kitchenAmt(food,g);
 }
 function kitchenAmt(food,g){
   const h = HH[food]; if(!h) return Math.round(g)+' g';
@@ -683,7 +690,7 @@ function mealCard(date,key){
   const rows = G.list.map(g=> g.cooks || g.each || g.scoop
     ? `<div class="grow"><span class="gname">${esc(g.name)}</span><span class="tapes">${vis.map(p=>tape(p,fmtPortion(g,p))).join('')}</span></div>`
     : g.comps.map(c=>`<div class="grow"><span class="gname">${esc(FOODS[c[0]].n)}</span><span class="tapes">${vis.filter(p=>cg(c,p)>0).map(p=>tape(p,household(c[0],raw(date,p,c)))).join('')}</span></div>`).join('')).join('');
-  const cookedNote = G.list.some(g=>g.cooks) ? `<div class="note">${G.list.some(g=>g.cooks&&g.actual)?'Cooked grams per person, from the cooked weight you entered':'Cooked grams per person, estimated. Weigh the whole batch and enter it under Recipe for exact portions'}. Cooked ${nice(cyc.start)}${idx>0||run[0]!==cyc.start?' · leftovers':''}.</div>` : '';
+  const cookedNote = G.list.some(g=>g.cooks) ? `<div class="note">${G.list.some(g=>g.cooks&&g.actual)?'Meat in cooked grams, from the cooked weight you entered. Sides in cups':'Meat in cooked grams (estimated until you enter the cooked weight under Recipe). Sides in cups'}. Cooked ${nice(cyc.start)}${idx>0||run[0]!==cyc.start?' · leftovers':''}.</div>` : '';
   // ingredients (raw, per person today)
   const live = G.run.filter(d=>!isFlex(d,key));
   const tot = {}; m.comps.forEach(c=>{ tot[c[0]] = (tot[c[0]]||0) + live.reduce((a,d)=>a+eaters(d,key).reduce((b,p)=>b+raw(d,p,c),0),0); });
@@ -1057,7 +1064,8 @@ document.addEventListener('visibilitychange', ()=>{
   if(document.visibilityState!=='visible' || !S || !TOKEN || Date.now()-lastLoad < 30e3) return;
   const dirty = SYNC_KEYS.some(k=>JSON.stringify(S[k])!==SNAP[k]);
   if(dirty) return;
-  lastLoad = Date.now(); boot();
+  lastLoad = Date.now();
+  fetch(location.pathname+'?v='+Date.now(), {cache:'no-store'}).then(r=>r.text()).then(t=>{ const m = t.match(/const APP_VERSION = '([^']+)'/); if(m && m[1]!==APP_VERSION) location.reload(); else boot(); }).catch(()=>boot());
 });
 start();
 </script>
