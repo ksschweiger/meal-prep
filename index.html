@@ -261,7 +261,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-09c';
+const APP_VERSION = '2026-11-09d';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat'};
@@ -272,7 +272,7 @@ const GLASS = {
   rocks:['Rocks glass','<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M5 8h14l-1.3 12H6.3z"/><path d="M6 14h12l-.6 5.3H6.6z" fill="currentColor" stroke="none" opacity=".55"/></svg>'],
   highball:['Highball glass','<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M7.5 3h9v18h-9z"/><path d="M7.5 9h9v12h-9z" fill="currentColor" stroke="none" opacity=".5"/></svg>']
 };
-const SPICE_N = {salt:'Salt',pepper:'Black pepper',garlic:'Garlic powder',onion:'Onion powder',paprika:'Paprika',italian:'Italian seasoning',chili:'Chili powder',cumin:'Cumin',oregano:'Oregano',soy:'Soy sauce',ginger:'Ginger paste',oil:'Olive oil',cinnamon:'Cinnamon',thyme:'Dried thyme'};
+const SPICE_N = {salt:'Salt',pepper:'Black pepper',garlic:'Garlic powder',onion:'Onion powder',paprika:'Paprika',italian:'Italian seasoning',chili:'Chili powder',cumin:'Cumin',oregano:'Oregano',soy:'Soy sauce',ginger:'Ginger paste',oil:'Olive oil',cinnamon:'Cinnamon',thyme:'Dried thyme',gingerground:'Ground ginger'};
 // Seasonings by weight for the scale, with the spoon measure as a backup (small amounts are hard to weigh).
 function spiceAmt(amt,unit,lb,sid){
   const g = amt*lb*(unit==='tbsp'?3:unit==='cup'?48:1)*(G_PER_TSP[sid]||2.5);
@@ -417,7 +417,7 @@ function applyTallow(){
     m.steps = m._steps.map(t=>{ outs.forEach(f=>{ const fb = FOODS[f].fallback; t = t.split('melted '+FOODS[f].n.toLowerCase()+' {f:'+f+'}').join(FOODS[fb].n.toLowerCase()+' {f:'+fb+'}').split('{f:'+f+'}').join('{f:'+fb+'}'); }); return t; });
   });
 }
-const G_PER_TSP = {salt:6, pepper:2.3, garlic:3, onion:2.5, paprika:2.3, italian:1, chili:2.7, cumin:2.1, oregano:1, soy:5.3, ginger:5, oil:4.5, cinnamon:2.6, thyme:1};
+const G_PER_TSP = {salt:6, pepper:2.3, garlic:3, onion:2.5, paprika:2.3, italian:1, chili:2.7, cumin:2.1, oregano:1, soy:5.3, ginger:5, oil:4.5, cinnamon:2.6, thyme:1, gingerground:1.8};
 // Grams of each seasoning or staple the week's recipes use (each batch counted once).
 function spiceNeeds(start,end){
   const g = {}, seen = new Set();
