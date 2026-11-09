@@ -261,7 +261,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-09b';
+const APP_VERSION = '2026-11-09c';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat'};
@@ -693,7 +693,11 @@ function mealCard(date,key){
   const cookedNote = G.list.some(g=>g.cooks) ? `<div class="note">${G.list.some(g=>g.cooks&&g.actual)?'Meat in cooked grams, from the cooked weight you entered. Sides in cups':'Meat in cooked grams (estimated until you enter the cooked weight under Recipe). Sides in cups'}. Cooked ${nice(cyc.start)}${idx>0||run[0]!==cyc.start?' · leftovers':''}.</div>` : '';
   // ingredients (raw, per person today)
   const live = G.run.filter(d=>!isFlex(d,key));
-  const tot = {}; m.comps.forEach(c=>{ tot[c[0]] = (tot[c[0]]||0) + live.reduce((a,d)=>a+eaters(d,key).reduce((b,p)=>b+raw(d,p,c),0),0); });
+  // Batch amounts. If a different raw amount was used for a food (cooked[runId]._raw), scale its whole group (oil, glaze) to match; spices follow the first food.
+  const amt = m.comps.map(c=>live.reduce((a,d)=>a+eaters(d,key).reduce((b,p)=>b+raw(d,p,c),0),0));
+  const ovr = (S.cooked[G.runId]||{})._raw||{}, gratio = {};
+  Object.keys(ovr).forEach(f=>{ const i = m.comps.findIndex(c=>c[0]===f); if(i<0) return; const grp = m.comps[i][3]; const planned = m.comps.reduce((a,c,j)=>a+(c[0]===f&&c[3]===grp?amt[j]:0),0); if(planned>0) gratio[grp] = ovr[f]/planned; });
+  const tot = {}; m.comps.forEach((c,j)=>{ tot[c[0]] = (tot[c[0]]||0) + amt[j]*(gratio[c[3]]||1); });
   const lb = (tot[m.comps[0][0]]||0)/454, sea = m.season||{};
   const ing = Object.keys(tot).map(f=>`<tr><td>${esc(FOODS[f].n)}</td><td class="n">${household(f,tot[f])}</td></tr>`).join('') + Object.keys(sea).map(k=>`<tr><td>${esc(SPICE_N[k]||k)}</td><td class="n">${spiceAmt(sea[k][0],sea[k][1],lb,k)}</td></tr>`).join('');
   const stepTxt = st => esc(st).replace(/\{f:(\w+)\}/g,(x,f)=>`<b class="q">(${household(f,tot[f]||0)})</b>`).replace(/\{s:(\w+)\}/g,(x,k)=>sea[k]?`<b class="q">(${spiceAmt(sea[k][0],sea[k][1],lb,k)})</b>`:'');
