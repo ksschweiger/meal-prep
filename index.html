@@ -13,7 +13,7 @@
 <style>
 /* Layout: phone-first single column, sticky header, fixed bottom tab bar; portions shown as masking-tape container labels */
 :root{
-  --bg:#F7EBDB; --surface:#FFFFFF; --sunk:#FFF4E6; --ink:#2B2117; --muted:#7A6856; --line:#EAD3B6; --pop:0 1px 2px rgba(80,45,10,.08),0 4px 14px rgba(80,45,10,.10);
+  --bg:#FAF0E3; --surface:#FFFFFF; --sunk:#FFF5E9; --ink:#2B2117; --muted:#7A6856; --line:#EEDAC0; --pop:0 1px 2px rgba(80,45,10,.06),0 3px 10px rgba(80,45,10,.07);
   --accent:#D9620F; --accent-ink:#FFFFFF; --accent-soft:#FFE5CF;
   --prep:#B57A0C; --prep-soft:#F7ECD3; --shop:#3A69A8; --shop-soft:#E2EAF6; --thaw:#2A84A0; --thaw-soft:#DBEFF4;
   --k:#3A69A8; --y:#94467F; --l:#BC6418;
@@ -25,7 +25,7 @@
   --mono:"JetBrains Mono", ui-monospace, Menlo, monospace;
 }
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
-  --bg:#110D09; --surface:#2A2119; --sunk:#352A20; --ink:#F6EDE2; --muted:#B5A390; --line:#4A3B2D; --pop:0 1px 2px rgba(0,0,0,.5),0 6px 18px rgba(0,0,0,.45);
+  --bg:#0E0B08; --surface:#2F251C; --sunk:#3A2E23; --ink:#F6EDE2; --muted:#B8A691; --line:#544332; --pop:0 1px 2px rgba(0,0,0,.6),0 6px 20px rgba(0,0,0,.55);
   --accent:#FF9A4D; --accent-ink:#24140A; --accent-soft:#3D2614;
   --prep:#E2B04C; --prep-soft:#372D14; --shop:#82A8DC; --shop-soft:#1B283A; --thaw:#6FC1D8; --thaw-soft:#162F37;
   --k:#82A8DC; --y:#D58DC3; --l:#E9A262;
@@ -34,7 +34,7 @@
   --drink:#E58AA8; --drink-soft:#3A1E28; --s-cozy:#E0A24E; --s-asian:#E0776A; --s-mexican:#83C06F; --s-med:#6FB3D6;
   color-scheme:dark }}
 :root[data-theme="dark"]{
-  --bg:#110D09; --surface:#2A2119; --sunk:#352A20; --ink:#F6EDE2; --muted:#B5A390; --line:#4A3B2D; --pop:0 1px 2px rgba(0,0,0,.5),0 6px 18px rgba(0,0,0,.45);
+  --bg:#0E0B08; --surface:#2F251C; --sunk:#3A2E23; --ink:#F6EDE2; --muted:#B8A691; --line:#544332; --pop:0 1px 2px rgba(0,0,0,.6),0 6px 20px rgba(0,0,0,.55);
   --accent:#FF9A4D; --accent-ink:#24140A; --accent-soft:#3D2614;
   --prep:#E2B04C; --prep-soft:#372D14; --shop:#82A8DC; --shop-soft:#1B283A; --thaw:#6FC1D8; --thaw-soft:#162F37;
   --k:#82A8DC; --y:#D58DC3; --l:#E9A262;
@@ -269,7 +269,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-09zb';
+const APP_VERSION = '2026-11-09zc';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -1265,7 +1265,7 @@ setInterval(()=>{ if(!S || !TOKEN || document.visibilityState!=='visible') retur
 // Light / dark / auto (follows the phone), saved per phone.
 function applyTheme(){ const v = lsGet('mp-theme'); if(v) document.documentElement.dataset.theme = v; else delete document.documentElement.dataset.theme;
   const dark = v==='dark' || (!v && matchMedia('(prefers-color-scheme: dark)').matches);
-  const m = document.querySelector('meta[name="theme-color"]'); if(m) m.content = dark ? '#2A2119' : '#D9620F'; }
+  const m = document.querySelector('meta[name="theme-color"]'); if(m) m.content = dark ? '#2F251C' : '#D9620F'; }
 applyTheme();
 start();
 </script>
