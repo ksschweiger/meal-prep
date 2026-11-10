@@ -268,7 +268,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-09w';
+const APP_VERSION = '2026-11-09x';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -781,7 +781,7 @@ function vDay(){
 function statsCard(){
   const log = (S.shopLog||[]).filter(x=>x.store);
   const money = v => '$'+(Math.round(v*100)/100).toFixed(2);
-  const bar = (label, n, of, extra) => `<div style="margin:6px 0"><div class="row between small"><span>${esc(label)}</span><span class="muted">${extra||''}</span></div><div class="bar" style="--pc:var(--accent)"><i style="width:${of?Math.round(n/of*100):0}%"></i></div></div>`;
+  const tile = (label, value, sub, color) => `<div style="background:var(--sunk);border:1px solid var(--line);border-radius:12px;padding:10px 12px"><div class="small muted">${label}</div><div class="money" style="font-size:22px;font-weight:700;${color?'color:'+color:''}">${value}</div>${sub?`<div class="small muted">${sub}</div>`:''}</div>`;
   let body = '';
   if(!log.length) body = `<p class="note" style="margin:4px 0 0">Stats start once you build your first cart: which store you use, whether you follow the recommendation, and how much comparing saves.</p>`;
   else {
@@ -789,18 +789,28 @@ function statsCard(){
     const stores = Object.keys(by).sort((a,b)=>by[b]-by[a]), usual = stores[0];
     const followed = log.filter(x=>x.recommended && x.recommended===x.store).length, withRec = log.filter(x=>x.recommended).length;
     const costs = log.filter(x=>x.cost!=null), avg = costs.reduce((a,x)=>a+x.cost,0)/(costs.length||1);
-    // Savings vs. putting every order at your usual store.
     const saved = log.reduce((a,x)=>a + ((x.totals||{})[usual]!=null && x.cost!=null ? (x.totals[usual]-x.cost) : 0), 0);
     const actual = log.filter(x=>x.actual!=null && x.cost!=null), drift = actual.length ? actual.reduce((a,x)=>a+(x.actual-x.cost),0)/actual.length : null;
-    body = `<div class="small muted" style="margin:2px 0 6px">${log.length} order${log.length>1?'s':''} since ${nice(log.map(x=>x.at.slice(0,10)).sort()[0])}</div>
-      <div style="font-weight:700;margin-top:6px">Where you shop</div>${stores.map(st=>bar(st, by[st], log.length, `${by[st]} · ${Math.round(by[st]/log.length*100)}%`)).join('')}
-      <div class="listrow" style="padding:6px 0"><span class="grow1">Followed the recommendation</span><span class="money">${followed} of ${withRec}</span></div>
-      <div class="listrow" style="padding:6px 0"><span class="grow1">Average order</span><span class="money">${money(avg)}</span></div>
-      <div class="listrow" style="padding:6px 0"><span class="grow1">Saved vs. always ${esc(usual.replace(' pickup',''))}</span><span class="money" style="color:${saved>=0?'var(--good)':'var(--bad)'}">${money(saved)}</span></div>
-      ${drift!=null?`<div class="listrow" style="padding:6px 0"><span class="grow1">Receipts vs. estimate (avg)</span><span class="money">${drift>=0?'+':''}${money(drift)}</span></div>`:''}`;
+    // Pie chart of where you shop.
+    const COLORS = ['var(--accent)','var(--shop)','var(--drink)','var(--thaw)','var(--warn)'];
+    let ang = -Math.PI/2; const R = 52, C = 60;
+    const slices = stores.map((st,i)=>{ const frac_ = by[st]/log.length, a2 = ang + frac_*2*Math.PI;
+      const path = frac_>=0.999 ? `<circle cx="${C}" cy="${C}" r="${R}" fill="${COLORS[i%5]}"/>`
+        : `<path d="M${C},${C} L${C+R*Math.cos(ang)},${C+R*Math.sin(ang)} A${R},${R} 0 ${frac_>0.5?1:0} 1 ${C+R*Math.cos(a2)},${C+R*Math.sin(a2)} Z" fill="${COLORS[i%5]}"/>`;
+      ang = a2; return path; }).join('');
+    const legend = stores.map((st,i)=>`<div class="row" style="gap:6px;margin:3px 0"><span style="width:10px;height:10px;border-radius:2px;background:${COLORS[i%5]};flex:none"></span><span class="small" style="flex:1">${esc(st)}</span><span class="small muted">${by[st]} · ${Math.round(by[st]/log.length*100)}%</span></div>`).join('');
+    body = `<div class="small muted" style="margin:2px 0 8px">${log.length} order${log.length>1?'s':''} since ${nice(log.map(x=>x.at.slice(0,10)).sort()[0])}</div>
+      <div style="background:var(--sunk);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px"><div class="small muted" style="margin-bottom:6px">Where you shop</div>
+        <div class="row" style="gap:14px;align-items:center"><svg viewBox="0 0 120 120" width="110" height="110" role="img" aria-label="Where you shop">${slices}</svg><div style="flex:1">${legend}</div></div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        ${tile('Average order', money(avg))}
+        ${tile('Saved by comparing', money(saved), 'vs. always '+esc(usual.replace(' pickup','')), saved>=0?'var(--good)':'var(--bad)')}
+        ${tile('Followed the pick', withRec?Math.round(followed/withRec*100)+'%':'—', `${followed} of ${withRec} orders`)}
+        ${tile('Receipts vs. estimate', drift==null?'—':(drift>=0?'+':'−')+money(Math.abs(drift)), drift==null?'add receipt photos':'average per order')}
+      </div>`;
   }
   const liked = Object.keys(S.ratings||{}).filter(id=>S.ratings[id]>0 && MEALS[id]), nope = Object.keys(S.ratings||{}).filter(id=>S.ratings[id]<0 && MEALS[id]);
-  const meals = liked.length||nope.length ? `<div style="font-weight:700;margin-top:10px">Meals</div>${liked.length?`<div class="small" style="margin:4px 0">👍 ${liked.map(id=>esc(MEALS[id].n)).join(', ')}</div>`:''}${nope.length?`<div class="small" style="margin:4px 0">👎 ${nope.map(id=>esc(MEALS[id].n)).join(', ')}</div>`:''}` : '';
+  const meals = liked.length||nope.length ? `<div style="background:var(--sunk);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:8px"><div class="small muted">Meals you rated</div>${liked.length?`<div class="small" style="margin:4px 0">👍 ${liked.map(id=>esc(MEALS[id].n)).join(', ')}</div>`:''}${nope.length?`<div class="small" style="margin:4px 0">👎 ${nope.map(id=>esc(MEALS[id].n)).join(', ')}</div>`:''}</div>` : '';
   return `<details class="card more" ${ui.statsOpen?'open':''}><summary data-act="statsopen">Shopping stats</summary>${body}${meals}</details>`;
 }
 // ---------- Store comparison (sample prices until real store prices are connected) ----------
