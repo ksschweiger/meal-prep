@@ -267,7 +267,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-09k';
+const APP_VERSION = '2026-11-09l';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken'};
@@ -442,7 +442,8 @@ function spiceNeeds(start,end){
 }
 const shows = p => S.view.mode==='both' || p===S.view.me || p==='L';
 function isWeekend(d){ const w = dow(d); return w===0 || w===6; }
-const eaters = (d,k) => { const a = (S.plan.days[d]||{}).away||[]; return KEY_PERSONS[k].filter(p=>!a.includes(p)); };
+// away: [person] = gone all day. out: {slot:[person]} = skips just that meal.
+const eaters = (d,k) => { const day = S.plan.days[d]||{}, a = day.away||[], o = (day.out||{})[k]||[]; return KEY_PERSONS[k].filter(p=>!a.includes(p) && !o.includes(p)); };
 const isAway = (d,p) => ((S.plan.days[d]||{}).away||[]).includes(p);
 function isFlex(d,k){ if(k==='ys') return true; if(S.plan.days[d] && !MEALS[S.plan.days[d][k]]) return true; // unknown or "none" recipe = nothing planned
   if(!eaters(d,k).length) return true; if(((S.plan.days[d]||{}).flex||[]).includes(k)) return true; if(k==='c') return false; if(S.plan.days[d] && S.plan.days[d].off) return true; if(!isWeekend(d)) return false; const m = S.settings.weekend; return m==='none' || (m==='light' && k!=='d'); }
@@ -463,7 +464,7 @@ function fac(date,p){
 const raw = (date,p,c) => FOODS[c[0]].fixed ? cg(c,p) : cg(c,p)*fac(date,p);
 function dayMacros(date,p){
   const day = S.plan.days[date], t = {k:0,p:0,c:0,f:0};
-  PERSON_KEYS[p].filter(k=>!isFlex(date,k) && !isSkipped(date,k) && !isAway(date,p)).forEach(k=>MEALS[day[k]].comps.forEach(c=>{ const f = FOODS[c[0]], g = raw(date,p,c)/100; t.k+=f.k*g; t.p+=f.p*g; t.c+=f.c*g; t.f+=f.f*g; }));
+  PERSON_KEYS[p].filter(k=>!isFlex(date,k) && !isSkipped(date,k) && !isAway(date,p) && eaters(date,k).includes(p==='L'?'Y':p)).forEach(k=>MEALS[day[k]].comps.forEach(c=>{ const f = FOODS[c[0]], g = raw(date,p,c)/100; t.k+=f.k*g; t.p+=f.p*g; t.c+=f.c*g; t.f+=f.f*g; }));
   return t;
 }
 const targets = p => { const m = S.macros[p]; return {k:m.kcal, p:m.kcal*m.p/400, c:m.kcal*m.c/400, f:m.kcal*m.f/900}; };
