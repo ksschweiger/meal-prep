@@ -268,7 +268,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-09s';
+const APP_VERSION = '2026-11-09t';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -319,8 +319,8 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>'
 // ---------- Live data ----------
 const API = 'https://script.google.com/macros/s/AKfycbxA3OApqNe6cCAINSDweKl0207wSilqda7bg3G5AdnNQ6vK7edcavIumCy-4MaAJVI/exec';
 const CLIENT_ID = '483809178986-kva2i39rl5iv08qkkfkdojla0ve6p5gq.apps.googleusercontent.com';
-const SYNC_KEYS = ['settings','macros','profile','plan','ratings','cooked','checks','locked','lockAdds','skipped','shopMoves','haveIt','styles','drinkOn','ptr'];
-const DEFAULTS = {settings:{prep:[1,3],shopDay:1,weekend:'light',maxRun:3,lead:3,store:'Meijer pickup',budget:750,landen:25}, macros:{K:{kcal:2600,p:35,c:40,f:25},Y:{kcal:1700,p:35,c:40,f:25}}, profile:{}, plan:null, ratings:{}, cooked:{}, checks:{}, locked:{}, lockAdds:{}, skipped:{}, shopMoves:{}, haveIt:{}, styles:[], drinkOn:{}, ptr:{}};
+const SYNC_KEYS = ['settings','macros','profile','plan','ratings','cooked','checks','locked','lockAdds','skipped','shopMoves','haveIt','styles','drinkOn','ptr','priceJobs','prices'];
+const DEFAULTS = {priceJobs:{}, prices:{}, settings:{prep:[1,3],shopDay:1,weekend:'light',maxRun:3,lead:3,store:'Meijer pickup',budget:750,landen:25}, macros:{K:{kcal:2600,p:35,c:40,f:25},Y:{kcal:1700,p:35,c:40,f:25}}, profile:{}, plan:null, ratings:{}, cooked:{}, checks:{}, locked:{}, lockAdds:{}, skipped:{}, shopMoves:{}, haveIt:{}, styles:[], drinkOn:{}, ptr:{}};
 const EMPTY_PLAN = () => ({cycles:[], days:{}, start:TODAY, end:TODAY});
 let S = null, USER = null, TOKEN = null, PANTRY = [];
 const SNAP = {}, PSNAP = {}; let FSNAP = '';
@@ -781,30 +781,53 @@ function vDay(){
 const STORES = [['Meijer','Meijer',1.00],['Kroger','Kroger',1.04],['Target','Target',1.09],['Aldi pickup','Aldi',0.92],['Aldi in store','Aldi',0.80]];
 function hashN(str){ let h = 2166136261; for(let i=0;i<str.length;i++){ h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return ((h>>>0)%1000)/1000; }
 function samplePrice(f, base, store, mult){ return Math.round(base*mult*(0.75 + hashN(f+'|'+store)*0.5)*100)/100; }
-function compareCard(items, ci){
-  items = items.filter(r=>r.packs>0 && r.F.price>0);
+// Price jobs: the app writes S.priceJobs[tripDate] = {status:'waiting', items:[...], at, by};
+// the PC (Claude in Chrome) fills S.prices[store][food] = {p, at, name} and sets status 'done'.
+// Building a cart: job.cart = {store, status:'waiting'} -> the PC fills that store's cart -> 'done'.
+const PICKUP = ['Meijer','Kroger','Target','Aldi pickup'];
+function compareCard(items, trip){
+  const jobs = S.priceJobs||{}, job = jobs[trip.date], prices = S.prices||{};
+  if(job && job.items) items = job.items.map(x=>({f:x.f, F:FOODS[x.f]||{n:x.n, pl:x.pl, price:0}, packs:x.packs, cost:x.cost||0}));
+  else items = items.filter(r=>r.packs>0).map(r=>({f:r.f.replace(/-mid$/,''), F:r.F, packs:r.packs, cost:r.cost}));
   if(!items.length) return '';
-  const st = STORES.map(([name,chain,mult])=>{ const lines = items.map(r=>({r, p:samplePrice(r.f, r.cost, name, mult)})); return {name, chain, lines, total:lines.reduce((a,x)=>a+x.p,0)}; });
-  const low = {}; items.forEach((r,i)=>{ low[r.f] = Math.min(...st.map(x=>x.lines[i].p)); });
-  // Recommendation compares pickup orders; Aldi in store is shown as its own option.
-  const pick = st.filter(x=>x.name!=='Aldi in store'), inStore = st.find(x=>x.name==='Aldi in store');
-  const best = pick.reduce((a,b)=>b.total<a.total?b:a);
-  // Best split across exactly two stores (different chains): each item from whichever of the two is cheaper.
-  let pair = null;
-  pick.forEach((a,i)=>pick.forEach((b,j)=>{ if(j<=i || a.chain===b.chain) return;
-    let tot = 0, na = 0, nb = 0; items.forEach((r,k)=>{ const pa = a.lines[k].p, pb = b.lines[k].p; if(pa<=pb){ tot += pa; na++; } else { tot += pb; nb++; } });
-    if(na && nb && (!pair || tot<pair.tot)) pair = {a, b, tot, na, nb}; }));
-  const save = pair ? best.total - pair.tot : 0, worth = save >= 10;
-  const rec = !pair || save < 1 ? `<b>Stick with ${esc(best.name)}.</b> Splitting into two orders wouldn't save anything.`
-    : worth ? `<b>Split it: ${esc(pair.a.name)} (${pair.na} items) + ${esc(pair.b.name)} (${pair.nb} items).</b> Saves about $${save.toFixed(2)} vs. all at ${esc(best.name)}.`
-    : `<b>Stick with ${esc(best.name)}.</b> Splitting between ${esc(pair.a.name)} and ${esc(pair.b.name)} only saves $${save.toFixed(2)}, probably not worth a second stop.`;
-  const goIn = inStore && best.total - inStore.total >= 1 ? `<div class="small" style="margin-top:6px">Or shop Aldi in person: $${inStore.total.toFixed(2)}, about $${(best.total-inStore.total).toFixed(2)} less than ${esc(best.name)}${/pickup/.test(best.name)?'':' pickup'}.</div>` : '';
-  const key = 'cmp'+ci;
-  const rows = st.slice().sort((a,b)=>a.total-b.total).map(x=>`<details class="cmp" ${ui.cmpOpen===x.name+key?'open':''}><summary data-act="cmpopen" data-k="${esc(x.name+key)}"><span class="grow1"><b>${esc(x.name)}</b>${x===best?' <span class="pill good">Cheapest pickup</span>':''}</span><span class="money" style="margin-left:auto;font-size:17px">$${x.total.toFixed(2)}</span></summary>
-    ${x.lines.map(l=>`<div class="listrow" style="padding:6px 0"><span class="grow1">${esc(l.r.F.n)}<br><span class="small muted">${esc(l.r.packs+' × '+l.r.F.pl)}</span></span><span class="money" style="${l.p===low[l.r.f]?'color:var(--good);font-weight:700':''}">$${l.p.toFixed(2)}</span></div>`).join('')}</details>`).join('');
-  return `<div class="card"><div class="eyebrow">Compare stores <span class="pill warn">Sample prices</span></div>
+  const real = items.some(r=>PICKUP.some(s=>(prices[s]||{})[r.f]));
+  const lineP = (store, r) => {
+    if(!real){ const st = STORES.find(x=>x[0]===store); return samplePrice(r.f, r.cost, store, st[2]); }
+    if(store==='Aldi in store'){ const a = (prices['Aldi pickup']||{})[r.f]; return a ? Math.round(a.p*r.packs*0.88*100)/100 : null; }
+    const x = (prices[store]||{})[r.f]; return x ? Math.round(x.p*r.packs*100)/100 : null; };
+  const st = STORES.map(([name,chain])=>{ const lines = items.map(r=>({r, p:lineP(name, r)})); const priced = lines.filter(l=>l.p!=null);
+    return {name, chain, lines, total:priced.reduce((a,x)=>a+x.p,0), missing:lines.length-priced.length}; });
+  const low = {}; items.forEach((r,i)=>{ const v = st.map(x=>x.lines[i].p).filter(p=>p!=null); low[r.f] = v.length ? Math.min(...v) : null; });
+  // Recommendation compares pickup orders (only stores that priced everything); Aldi in store is its own option.
+  const pick = st.filter(x=>x.name!=='Aldi in store' && !x.missing), inStore = st.find(x=>x.name==='Aldi in store');
+  let rec = '', goIn = '', best = null;
+  if(pick.length){
+    best = pick.reduce((a,b)=>b.total<a.total?b:a);
+    let pair = null;
+    pick.forEach((a,i)=>pick.forEach((b,j)=>{ if(j<=i || a.chain===b.chain) return;
+      let tot = 0, na = 0, nb = 0; items.forEach((r,k)=>{ const pa = a.lines[k].p, pb = b.lines[k].p; if(pa<=pb){ tot += pa; na++; } else { tot += pb; nb++; } });
+      if(na && nb && (!pair || tot<pair.tot)) pair = {a, b, tot, na, nb}; }));
+    const save = pair ? best.total - pair.tot : 0;
+    rec = !pair || save < 1 ? `<b>Stick with ${esc(best.name)}.</b> Splitting into two orders wouldn't save anything.`
+      : save >= 10 ? `<b>Split it: ${esc(pair.a.name)} (${pair.na} items) + ${esc(pair.b.name)} (${pair.nb} items).</b> Saves about $${save.toFixed(2)} vs. all at ${esc(best.name)}.`
+      : `<b>Stick with ${esc(best.name)}.</b> Splitting between ${esc(pair.a.name)} and ${esc(pair.b.name)} only saves $${save.toFixed(2)}, probably not worth a second stop.`;
+    goIn = inStore && !inStore.missing && best.total - inStore.total >= 1 ? `<div class="small" style="margin-top:6px">Or shop Aldi in person: about $${inStore.total.toFixed(2)}${real?' (estimated)':''}, roughly $${(best.total-inStore.total).toFixed(2)} less than ${esc(best.name)}${/pickup/.test(best.name)?'':' pickup'}.</div>` : '';
+  } else rec = 'Some stores are still missing prices.';
+  const key = 'cmp'+trip.date, done = job && job.status==='done', cart = job && job.cart;
+  const rows = st.slice().sort((a,b)=>(a.missing-b.missing)||(a.total-b.total)).map(x=>`<details class="cmp" ${ui.cmpOpen===x.name+key?'open':''}><summary data-act="cmpopen" data-k="${esc(x.name+key)}"><span class="grow1"><b>${esc(x.name)}</b>${x===best?' <span class="pill good">Cheapest pickup</span>':''}${x.missing?` <span class="pill warn">${x.missing} not priced</span>`:''}</span><span class="money" style="margin-left:auto;font-size:17px">$${x.total.toFixed(2)}</span></summary>
+    ${x.lines.map(l=>`<div class="listrow" style="padding:6px 0"><span class="grow1">${esc(l.r.F.n)}<br><span class="small muted">${esc(l.r.packs+' × '+(l.r.F.pl||''))}${real&&x.name!=='Aldi in store'&&(prices[x.name]||{})[l.r.f]?' · '+esc((prices[x.name][l.r.f].name||'').slice(0,40)):''}</span></span><span class="money" style="${l.p!=null&&l.p===low[l.r.f]?'color:var(--good);font-weight:700':''}">${l.p==null?'—':'$'+l.p.toFixed(2)}</span></div>`).join('')}
+    ${done && PICKUP.includes(x.name) && !(cart && cart.status==='waiting') ? `<button class="btn primary block" style="margin:6px 0 10px" data-act="buildcart" data-trip="${trip.date}" data-store="${esc(x.name)}">Build ${esc(x.name.replace(' pickup',''))} cart</button>` : ''}</details>`).join('');
+  const asOf = real ? (()=>{ const ds_ = []; PICKUP.forEach(s=>items.forEach(r=>{ const x=(prices[s]||{})[r.f]; if(x&&x.at) ds_.push(x.at); })); ds_.sort(); return ds_.length ? `Prices as of ${nice(ds_[0].slice(0,10))}` : ''; })() : '';
+  let status;
+  if(!job) status = `<button class="btn primary block" data-act="compare" data-trip="${trip.date}">Compare cost</button><p class="note" style="margin:4px 0 0">Locks the checked items and asks the computer to look up real prices at each store. Takes a few minutes.</p>`;
+  else if(job.status!=='done') status = `<div class="status"><span style="flex:1"><b>Checking prices…</b> Requested ${job.by?esc(job.by)+' · ':''}${fmtTime(job.at)}. Results show up here.</span><button class="btn" style="padding:6px 12px" data-act="unlocklist" data-trip="${trip.date}">Cancel</button></div>`;
+  else if(cart && cart.status!=='done') status = `<div class="status"><span style="flex:1"><b>Building your ${esc(cart.store.replace(' pickup',''))} cart…</b> Requested ${fmtTime(cart.at)}.</span></div>`;
+  else if(cart) status = `<div class="status"><span style="flex:1"><b>${esc(cart.store.replace(' pickup',''))} cart is ready.</b> Open the ${esc(cart.store.replace(' pickup',''))} app to review and submit.${cart.note?' '+esc(cart.note):''}</span></div><button class="btn block" style="margin-top:6px" data-act="unlocklist" data-trip="${trip.date}">Unlock list</button>`;
+  else status = `<p class="note" style="margin:0">List locked. Open a store and tap Build cart, or</p><button class="btn block" style="margin-top:6px" data-act="unlocklist" data-trip="${trip.date}">Unlock list to change it</button>`;
+  return `<div class="card"><div class="eyebrow">Compare stores ${real?`<span class="pill good">${esc(asOf)}</span>`:'<span class="pill warn">Sample prices</span>'}</div>
     <div class="banner prep" style="margin:6px 0 8px"><div>${rec}${goIn}</div></div>${rows}
-    <p class="note" style="margin:6px 0 0">Prices are made-up samples for testing the layout. Real prices come in phase 2. Green = lowest price for that item. Aldi pickup prices run higher than in store.</p></div>`;
+    <div style="margin-top:8px">${status}</div>
+    <p class="note" style="margin:6px 0 0">${real?'Real store prices from the computer. Aldi in store is estimated about 12% under Aldi pickup.':'Sample prices until you tap Compare cost.'} Green = lowest price for that item.</p></div>`;
 }
 // One shopping week's list: rows by category (Midweek = the fresh trip), pantry/freezer checks and seasonings.
 function groceryData(ci){
@@ -869,16 +892,18 @@ function vGroceries(){
   // Items you usually have (milk, eggs…) and close calls start unchecked; everything else starts checked.
   const lkey = r => 'L|'+trip.date+'|'+r.f.replace(/-mid$/,'');
   const onList = r => { const v = S.checks[lkey(r)]; return v===undefined ? !!r.defOn : v; };
+  const locked = !!(S.priceJobs||{})[trip.date];
   Object.values(rows).forEach(a=>a.forEach(r=>{ r.defOn = r.packs>0; }));
   common.forEach(r=>{ r.defOn = false; r.usual = true; (rows[r.F.cat] = rows[r.F.cat]||[]).push(r); });
   checks.forEach(k=>{ if(k.kind==='staple'){ const F = FOODS[k.f]; if(![].concat(...Object.values(rows)).some(r=>r.f===k.f)) (rows[F.cat] = rows[F.cat]||[]).push({f:k.f, F, need:k.g, packs:1, cost:F.price, defOn:false, close:'pantry'}); }
     else if(k.kind==='meat'){ const r = [].concat(...Object.values(rows)).find(x=>x.f===k.f); if(r) r.close = 'freezer'; } });
   const picked = () => [].concat(...Object.values(rows)).filter(r=>r.packs>0 && onList(r));
   total = picked().reduce((a,r)=>a+r.cost,0) + buySp.length*3.49;
+  ui._picked = picked();
   const tripBar = `<div class="row" style="justify-content:center;gap:6px;flex-wrap:wrap">${T.map((x,i)=>`<button class="chip ${i===ui.trip?'on':''}" data-act="trip" data-i="${i}">${nice(x.date)}</button>`).join('')}</div>`;
   const tspTxt = (id,g) => { const t = g/(G_PER_TSP[id]||2.5); return t>=3 ? frac(Math.max(.25,Math.round(t/3*4)/4))+' tbsp' : frac(Math.max(.25,Math.round(t*4)/4))+' tsp'; };
   const ozTxt = g => (Math.round(g/28.35*10)/10)+' oz';
-  const cbox = (key, body, extraCls, on) => { on = on===undefined ? !!S.checks[key] : on; return `<label class="listrow ${on?'':'off'} ${extraCls||''}"><input type="checkbox" class="check" id="chk-${key.replace(/[^a-z0-9]/gi,'_')}" data-act="listpick" data-key="${key}" ${on?'checked':''}>${body}</label>`; };
+  const cbox = (key, body, extraCls, on) => { on = on===undefined ? !!S.checks[key] : on; return `<label class="listrow ${on?'':'off'} ${extraCls||''}"><input type="checkbox" class="check" id="chk-${key.replace(/[^a-z0-9]/gi,'_')}" data-act="listpick" data-key="${key}" ${on?'checked':''} ${locked?'disabled':''}>${body}</label>`; };
   const chkRows = checks.map(k=>{
     if(k.kind==='meat') return cbox(ci+'|ckm-'+k.f, `<span class="grow1">${esc(FOODS[k.f].n)} <span class="pill thaw">Freezer</span><br><span class="small muted">Need about ${Math.ceil(need[k.f]/454-.05)} lb · freezer shows ${Math.round(onHand(k.f)/454)} lb</span></span>`);
     if(k.kind==='staple') return cbox(ci+'|cks-'+k.f, `<span class="grow1">${esc(k.st.n)} <span class="pill warn">Pantry</span><br><span class="small muted">Need about ${ozTxt(k.g)} · pantry shows ${k.st.have} oz</span></span>`);
@@ -911,7 +936,7 @@ function vGroceries(){
   const tripNote = trip.kind==='mid' ? `${esc(S.settings.store)}` : `${esc(S.settings.store)} · covers ${nice(c.start)} dinner through ${c.end<S.plan.end ? nice(add(c.end,1))+' lunch' : nice(S.plan.end)+' (end of the plan)'}`;
   return `<h2 style="font-size:22px">Shopping</h2>${tripBar}
   <p class="note" style="margin:-4px 0 0;text-align:center">${tripNote}</p>
-  ${compareCard(picked(), ci)}<div class="card budget"><div class="row between"><span class="eyebrow">Estimated</span><span class="eyebrow">${noBudget?'':'Monthly pace'}</span></div>
+  ${compareCard(picked(), trip)}<div class="card budget"><div class="row between"><span class="eyebrow">Estimated</span><span class="eyebrow">${noBudget?'':'Monthly pace'}</span></div>
     <div class="row between"><span class="bignum money">$${total.toFixed(2)}</span>${noBudget?`<span class="small muted">Budget starts ${MON[+S.settings.budgetFrom.slice(5,7)-1]}</span></div>`:`<span class="money" style="font-size:17px;color:${pace>budget?'var(--bad)':'var(--good)'}">$${Math.round(pace)} / $${budget}</span></div>
     <div class="bar" style="--pc:${pace>budget?'var(--bad)':'var(--good)'}"><i style="width:${pct}%"></i></div>`}
     ${trip.kind==='mid' ? `<button class="btn primary block" data-act="cart" data-ci="${ci}">Add to Meijer cart</button>` : ((S.locked||{})[c.start]
@@ -1075,6 +1100,12 @@ document.addEventListener('click', e=>{
   else if(a==='skip'){ S.skipped = S.skipped||{}; const k = t.dataset.date+'|'+t.dataset.key; if(S.skipped[k]) delete S.skipped[k]; else S.skipped[k] = true; changed('Skipped meals'); render(); }
   else if(a==='goal'){ S.profile = S.profile||{}; const pr = S.profile[t.dataset.p] = S.profile[t.dataset.p]||{wt:'',act:'active'}; pr.goal = t.dataset.v;
     if(autoMacros(t.dataset.p)){ changed('Macros'); toast(`Targets updated for ${NAMES[t.dataset.p]}.`); } else { save(); toast('Enter a weight to fill in the targets.'); } render(); }
+  else if(a==='compare'){ const T = upcomingTrips(), tr = T.find(x=>x.date===t.dataset.trip); if(!tr) return;
+    const items = (ui._picked||[]).map(r=>({f:r.f.replace(/-mid$/,''), n:r.F.n, pl:r.F.pl, packs:r.packs, cost:r.cost}));
+    S.priceJobs = S.priceJobs||{}; S.priceJobs[tr.date] = {status:'waiting', at:new Date().toISOString(), by:USER.name, items};
+    changed('Price check'); render(); toast('Price check requested. Results show up here in a few minutes.'); }
+  else if(a==='buildcart'){ const j = (S.priceJobs||{})[t.dataset.trip]; if(!j) return; j.cart = {store:t.dataset.store, status:'waiting', at:new Date().toISOString(), by:USER.name}; changed('Build cart'); render(); toast(`Building your ${t.dataset.store.replace(' pickup','')} cart.`); }
+  else if(a==='unlocklist'){ if(S.priceJobs) delete S.priceJobs[t.dataset.trip]; changed('Price check'); render(); }
   else if(a==='cmpopen'){ e.preventDefault(); ui.cmpOpen = ui.cmpOpen===t.dataset.k ? null : t.dataset.k; render(); }
   else if(a==='mopen'){ ui.mealOpen[t.dataset.k] = !ui.mealOpen[t.dataset.k]; const sc = window.scrollY; render(); window.scrollTo(0,sc); }
   else if(a==='haveit'){ S.haveIt = S.haveIt||{}; S.haveIt[t.dataset.k] = !S.haveIt[t.dataset.k]; changed('Groceries'); render(); }
@@ -1181,6 +1212,10 @@ document.addEventListener('visibilitychange', ()=>{
   lastLoad = Date.now();
   fetch(location.pathname+'?v='+Date.now(), {cache:'no-store'}).then(r=>r.text()).then(t=>{ const m = t.match(/const APP_VERSION = '([^']+)'/); if(m && m[1]!==APP_VERSION) location.reload(); else boot(); }).catch(()=>boot());
 });
+// While a price check or cart build is waiting on the computer, reload every 30 seconds to show the result.
+setInterval(()=>{ if(!S || !TOKEN || document.visibilityState!=='visible') return;
+  const waiting = Object.values(S.priceJobs||{}).some(j=>j.status!=='done' || (j.cart && j.cart.status!=='done'));
+  if(waiting && !SYNC_KEYS.some(k=>JSON.stringify(S[k])!==SNAP[k])) boot(); }, 30e3);
 start();
 </script>
 </body>
