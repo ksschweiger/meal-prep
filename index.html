@@ -268,7 +268,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-09u';
+const APP_VERSION = '2026-11-09v';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -319,8 +319,8 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>'
 // ---------- Live data ----------
 const API = 'https://script.google.com/macros/s/AKfycbxA3OApqNe6cCAINSDweKl0207wSilqda7bg3G5AdnNQ6vK7edcavIumCy-4MaAJVI/exec';
 const CLIENT_ID = '483809178986-kva2i39rl5iv08qkkfkdojla0ve6p5gq.apps.googleusercontent.com';
-const SYNC_KEYS = ['settings','macros','profile','plan','ratings','cooked','checks','locked','lockAdds','skipped','shopMoves','haveIt','styles','drinkOn','ptr','priceJobs','prices'];
-const DEFAULTS = {priceJobs:{}, prices:{}, settings:{prep:[1,3],shopDay:1,weekend:'light',maxRun:3,lead:3,store:'Meijer pickup',budget:750,landen:25}, macros:{K:{kcal:2600,p:35,c:40,f:25},Y:{kcal:1700,p:35,c:40,f:25}}, profile:{}, plan:null, ratings:{}, cooked:{}, checks:{}, locked:{}, lockAdds:{}, skipped:{}, shopMoves:{}, haveIt:{}, styles:[], drinkOn:{}, ptr:{}};
+const SYNC_KEYS = ['settings','macros','profile','plan','ratings','cooked','checks','locked','lockAdds','skipped','shopMoves','haveIt','styles','drinkOn','ptr','priceJobs','prices','shopLog'];
+const DEFAULTS = {priceJobs:{}, prices:{}, shopLog:[], settings:{prep:[1,3],shopDay:1,weekend:'light',maxRun:3,lead:3,store:'Meijer pickup',budget:750,landen:25}, macros:{K:{kcal:2600,p:35,c:40,f:25},Y:{kcal:1700,p:35,c:40,f:25}}, profile:{}, plan:null, ratings:{}, cooked:{}, checks:{}, locked:{}, lockAdds:{}, skipped:{}, shopMoves:{}, haveIt:{}, styles:[], drinkOn:{}, ptr:{}};
 const EMPTY_PLAN = () => ({cycles:[], days:{}, start:TODAY, end:TODAY});
 let S = null, USER = null, TOKEN = null, PANTRY = [];
 const SNAP = {}, PSNAP = {}; let FSNAP = '';
@@ -819,6 +819,7 @@ function compareCard(items, trip){
       : `<b>Stick with ${esc(best.name)}.</b> Splitting between ${esc(pair.a.name)} and ${esc(pair.b.name)} only saves $${save.toFixed(2)}, probably not worth a second stop.`;
     goIn = inStore && !inStore.missing && best.total - inStore.total >= 1 ? `<div class="small" style="margin-top:6px">Or shop Aldi in person: about $${inStore.total.toFixed(2)} (estimated), roughly $${(best.total-inStore.total).toFixed(2)} less than ${esc(best.name)}${/pickup/.test(best.name)?'':' pickup'}.</div>` : '';
   } else rec = 'Some items still need prices. Tap Recalculate.';
+  ui._cmp = {best: best && best.name, totals: Object.fromEntries(st.map(x=>[x.name, Math.round(x.total*100)/100]))};
   const key = 'cmp'+trip.date, cartBusy = cart && cart.status!=='done';
   const rows = st.slice().sort((a,b)=>(a.missing-b.missing)||(a.total-b.total)).map(x=>`<details class="cmp" ${ui.cmpOpen===x.name+key?'open':''}><summary data-act="cmpopen" data-k="${esc(x.name+key)}"><span class="grow1"><b>${esc(x.name)}</b>${x===best?' <span class="pill good">Cheapest pickup</span>':''}${x.missing?` <span class="pill warn">${x.missing} not priced</span>`:''}</span><span class="money" style="margin-left:auto;font-size:17px">$${x.total.toFixed(2)}</span></summary>
     ${x.lines.map(l=>`<div class="listrow" style="padding:6px 0"><span class="grow1">${esc(l.r.F.n)}<br><span class="small muted">${esc(l.r.packs+' × '+(l.r.F.pl||''))}${x.name!=='Aldi in store'&&(prices[x.name]||{})[l.r.f]?' · '+esc((prices[x.name][l.r.f].name||'').slice(0,40)):''}</span></span><span class="money" style="${l.p!=null&&l.p===low[l.r.f]?'color:var(--good);font-weight:700':''}">${l.p==null?'—':'$'+l.p.toFixed(2)}</span></div>`).join('')}
@@ -1106,7 +1107,8 @@ document.addEventListener('click', e=>{
     const items = (ui._picked||[]).filter(r=>r.packs>0).map(r=>({f:r.f.replace(/-mid$/,''), n:r.F.n, pl:r.F.pl, packs:r.packs, cost:r.cost}));
     S.priceJobs = S.priceJobs||{}; S.priceJobs[tr.date] = {status:'waiting', at:new Date().toISOString(), by:USER.name, items};
     changed('Price check'); render(); toast('Price check requested. Results show up here in a few minutes.'); }
-  else if(a==='buildcart'){ const j = (S.priceJobs||{})[t.dataset.trip]; if(!j) return; j.items = (ui._picked||[]).filter(r=>r.packs>0).map(r=>({f:r.f.replace(/-mid$/,''), n:r.F.n, pl:r.F.pl, packs:r.packs, cost:r.cost})); j.cart = {store:t.dataset.store, status:'waiting', at:new Date().toISOString(), by:USER.name}; changed('Build cart'); render(); toast(`Building your ${t.dataset.store.replace(' pickup','')} cart.`); }
+  else if(a==='buildcart'){ const j = (S.priceJobs||{})[t.dataset.trip]; if(!j) return; j.items = (ui._picked||[]).filter(r=>r.packs>0).map(r=>({f:r.f.replace(/-mid$/,''), n:r.F.n, pl:r.F.pl, packs:r.packs, cost:r.cost})); j.cart = {store:t.dataset.store, status:'waiting', at:new Date().toISOString(), by:USER.name};
+    (S.shopLog = S.shopLog||[]).push({trip:t.dataset.trip, at:j.cart.at, by:USER.name, store:t.dataset.store, recommended:(ui._cmp||{}).best||null, totals:(ui._cmp||{}).totals||{}, items:j.items.length, cost:((ui._cmp||{}).totals||{})[t.dataset.store]||null}); changed('Build cart'); render(); toast(`Building your ${t.dataset.store.replace(' pickup','')} cart.`); }
   else if(a==='unlocklist'){ if(S.priceJobs) delete S.priceJobs[t.dataset.trip]; changed('Price check'); render(); }
   else if(a==='cmpopen'){ e.preventDefault(); ui.cmpOpen = ui.cmpOpen===t.dataset.k ? null : t.dataset.k; render(); }
   else if(a==='mopen'){ ui.mealOpen[t.dataset.k] = !ui.mealOpen[t.dataset.k]; const sc = window.scrollY; render(); window.scrollTo(0,sc); }

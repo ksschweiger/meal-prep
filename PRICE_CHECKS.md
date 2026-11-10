@@ -47,3 +47,10 @@ The app and the computer talk through two keys on the Data tab of the Meal Prep 
   sends a push right away through the Notification Hub's senders (ntfy for Kayla, Bark for Kaleb), to the
   person in `by`: "Grocery prices are in" / "Your Meijer cart is ready — open the app to submit".
 - Sent directly from the computer, not through the hub's hourly queue, so it isn't delayed up to an hour.
+
+## Metrics (`shopLog`, written by the app; the computer may add fields)
+
+Each cart build appends `{trip, at, by, store, recommended, totals:{store: $}, items, cost}`.
+The computer adds `actual` (receipt total) when a receipt photo comes in.
+Planned uses: store pick share and whether the recommendation was followed (prioritize the usual store
+in price checks), estimate vs. receipt accuracy, item price trends from `prices` history, and savings to date.
