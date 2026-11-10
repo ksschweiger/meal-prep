@@ -175,6 +175,7 @@ ol.steps{margin:10px 0 0;padding-left:20px;display:flex;flex-direction:column;ga
 .pill.thaw{background:var(--thaw-soft);color:var(--thaw)}
 .pill.warn{background:var(--prep-soft);color:var(--prep)}
 .pill.bad{background:color-mix(in srgb,var(--bad) 15%,var(--surface));color:var(--bad)}
+.listrow.off .grow1, .listrow.off .q{opacity:.5}
 .pill.good{background:color-mix(in srgb,var(--good) 15%,var(--surface));color:var(--good)}
 details.cmp{border-top:1px solid var(--line)}
 details.cmp summary{display:flex;width:100%;align-items:center;gap:8px;padding:10px 0;cursor:pointer;list-style:none}
@@ -267,7 +268,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-09o';
+const APP_VERSION = '2026-11-09p';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -864,11 +865,20 @@ function vGroceries(){
   // Same food twice (e.g. weekly + fresh-trip peppers) becomes one line.
   Object.keys(rows).forEach(k=>{ const by = {}; rows[k] = rows[k].filter(r=>{ const base = r.f.replace(/-mid$/,''), x = by[base];
     if(!x){ by[base] = r; return true; } x.packs += r.packs; x.cost += r.cost; x.need += r.need; return false; }); });
-  total = [].concat(...Object.values(rows)).reduce((a,r)=>a+r.cost,0) + common.filter(r=>!haveIt(r.f)).reduce((a,r)=>a+r.cost,0) + buySp.length*3.49;
+  // One list: everything this trip's meals use. The checkbox = "put it on the grocery list".
+  // Items you usually have (milk, eggs…) and close calls start unchecked; everything else starts checked.
+  const lkey = r => 'L|'+trip.date+'|'+r.f.replace(/-mid$/,'');
+  const onList = r => { const v = S.checks[lkey(r)]; return v===undefined ? !!r.defOn : v; };
+  Object.values(rows).forEach(a=>a.forEach(r=>{ r.defOn = r.packs>0; }));
+  common.forEach(r=>{ r.defOn = false; r.usual = true; (rows[r.F.cat] = rows[r.F.cat]||[]).push(r); });
+  checks.forEach(k=>{ if(k.kind==='staple'){ const F = FOODS[k.f]; if(![].concat(...Object.values(rows)).some(r=>r.f===k.f)) (rows[F.cat] = rows[F.cat]||[]).push({f:k.f, F, need:k.g, packs:1, cost:F.price, defOn:false, close:'pantry'}); }
+    else if(k.kind==='meat'){ const r = [].concat(...Object.values(rows)).find(x=>x.f===k.f); if(r) r.close = 'freezer'; } });
+  const picked = () => [].concat(...Object.values(rows)).filter(r=>r.packs>0 && onList(r));
+  total = picked().reduce((a,r)=>a+r.cost,0) + buySp.length*3.49;
   const tripBar = `<div class="row" style="justify-content:center;gap:6px;flex-wrap:wrap">${T.map((x,i)=>`<button class="chip ${i===ui.trip?'on':''}" data-act="trip" data-i="${i}">${nice(x.date)}</button>`).join('')}</div>`;
   const tspTxt = (id,g) => { const t = g/(G_PER_TSP[id]||2.5); return t>=3 ? frac(Math.max(.25,Math.round(t/3*4)/4))+' tbsp' : frac(Math.max(.25,Math.round(t*4)/4))+' tsp'; };
   const ozTxt = g => (Math.round(g/28.35*10)/10)+' oz';
-  const cbox = (key, body, extraCls) => { const on = !!S.checks[key]; return `<label class="listrow ${on?'done':''} ${extraCls||''}"><input type="checkbox" class="check" id="chk-${key.replace(/[^a-z0-9]/gi,'_')}" data-act="check" data-key="${key}" ${on?'checked':''}>${body}</label>`; };
+  const cbox = (key, body, extraCls, on) => { on = on===undefined ? !!S.checks[key] : on; return `<label class="listrow ${on?'':'off'} ${extraCls||''}"><input type="checkbox" class="check" id="chk-${key.replace(/[^a-z0-9]/gi,'_')}" data-act="listpick" data-key="${key}" ${on?'checked':''}>${body}</label>`; };
   const chkRows = checks.map(k=>{
     if(k.kind==='meat') return cbox(ci+'|ckm-'+k.f, `<span class="grow1">${esc(FOODS[k.f].n)} <span class="pill thaw">Freezer</span><br><span class="small muted">Need about ${Math.ceil(need[k.f]/454-.05)} lb · freezer shows ${Math.round(onHand(k.f)/454)} lb</span></span>`);
     if(k.kind==='staple') return cbox(ci+'|cks-'+k.f, `<span class="grow1">${esc(k.st.n)} <span class="pill warn">Pantry</span><br><span class="small muted">Need about ${ozTxt(k.g)} · pantry shows ${k.st.have} oz</span></span>`);
@@ -877,9 +887,9 @@ function vGroceries(){
   const chk = chkRows ? `<div class="card" style="border-color:var(--warn)"><div class="eyebrow" style="color:var(--warn)">Check before you shop</div>${chkRows}<p class="note" style="margin:4px 0 0">It might be close. Check it off if you have enough, or add it to the cart.</p></div>` : '';
   const commonCard = common.length ? `<div class="card"><div class="eyebrow">Probably have at home</div>${common.map(r=>{ const h = haveIt(r.f); return `<div class="listrow"><span class="grow1" style="${h?'text-decoration:line-through;color:var(--muted)':''}">${esc(r.F.n)}<br><span class="small muted">${r.packs} × ${esc(r.F.pl)}${h?'':` · $${r.cost.toFixed(2)}`}</span></span><button class="btn" style="padding:5px 10px;font-size:13px" data-act="haveit" data-k="${ci}|${r.f}">${h?'Need it':'Have it'}</button></div>`; }).join('')}<p class="note" style="margin:4px 0 0">Tap Have it to drop it from the list and the total.</p></div>` : '';
   const days = between(c.start,c.end)+1, pace = total/days*30.4, budget = S.settings.budget, pct = Math.min(100, pace/budget*100);
-  const item = r => { const key = ci+'|'+r.f;
-    const note = [r.also&&r.also.length?`<span class="small muted">Also for ${esc(r.also.join(', '))}</span>`:'', r.fromF?`<span class="pill thaw">${Math.round(r.fromF/454*10)/10} lb from freezer</span>`:'', r.fromP?`<span class="pill warn">${ozTxt(r.fromP)} from pantry</span>`:'', r.short?`<span class="pill bad">Not enough in freezer</span>`:'', r.staple&&r.packs?`<span class="note">Extra goes to the pantry</span>`:'', !r.staple&&r.packs&&r.extra>40&&r.F.cat!=='Produce'?`<span class="note">${Math.round(r.extra)} g left over → next plan</span>`:''].join(' ');
-    return cbox(key, `<span class="grow1"><span>${esc(r.F.n)}</span><br>${note}</span><span class="q">${r.packs?esc(r.packs+' × '+r.F.pl):'—'}<br><span class="money muted">${r.cost?'$'+r.cost.toFixed(2):''}</span></span>`); };
+  const item = r => { const key = lkey(r);
+    const note = [r.usual?'<span class="small muted">Usually have it</span>':'', r.close==='freezer'?'<span class="pill warn">Freezer is close, check it</span>':'', r.close==='pantry'?'<span class="pill warn">Pantry is close, check it</span>':'', r.also&&r.also.length?`<span class="small muted">Also for ${esc(r.also.join(', '))}</span>`:'', r.fromF?`<span class="pill thaw">${Math.round(r.fromF/454*10)/10} lb from freezer</span>`:'', r.fromP?`<span class="pill warn">${ozTxt(r.fromP)} from pantry</span>`:'', r.short?`<span class="pill bad">Not enough in freezer</span>`:'', r.staple&&r.packs?`<span class="note">Extra goes to the pantry</span>`:'', !r.staple&&r.packs&&r.extra>40&&r.F.cat!=='Produce'?`<span class="note">${Math.round(r.extra)} g left over → next plan</span>`:''].join(' ');
+    return cbox(key, `<span class="grow1"><span>${esc(r.F.n)}</span><br>${note}</span><span class="q">${r.packs?esc(r.packs+' × '+r.F.pl):'—'}<br><span class="money muted">${r.cost?'$'+r.cost.toFixed(2):''}</span></span>`, '', r.packs>0 ? onList(r) : false); };
   // Group what's coming home by the meal it's for. A food used in several meals sits under the one that uses the most.
   const dayRange = ds_ => { const a = ds_.slice().sort(); return a.length>1 ? `${DOW[dow(a[0])]}–${DOW[dow(a[a.length-1])]}` : DOW[dow(a[0])]; };
   const byMeal = {}, other = [];
@@ -895,7 +905,7 @@ function vGroceries(){
   const tripNote = trip.kind==='mid' ? `${esc(S.settings.store)}` : `${esc(S.settings.store)} · covers ${nice(c.start)} dinner through ${c.end<S.plan.end ? nice(add(c.end,1))+' lunch' : nice(S.plan.end)+' (end of the plan)'}`;
   return `<h2 style="font-size:22px">Shopping</h2>${tripBar}
   <p class="note" style="margin:-4px 0 0;text-align:center">${tripNote}</p>
-  ${compareCard([].concat(...Object.values(rows), common.filter(r=>!haveIt(r.f))), ci)}<div class="card budget"><div class="row between"><span class="eyebrow">Estimated</span><span class="eyebrow">${noBudget?'':'Monthly pace'}</span></div>
+  ${compareCard(picked(), ci)}<div class="card budget"><div class="row between"><span class="eyebrow">Estimated</span><span class="eyebrow">${noBudget?'':'Monthly pace'}</span></div>
     <div class="row between"><span class="bignum money">$${total.toFixed(2)}</span>${noBudget?`<span class="small muted">Budget starts ${MON[+S.settings.budgetFrom.slice(5,7)-1]}</span></div>`:`<span class="money" style="font-size:17px;color:${pace>budget?'var(--bad)':'var(--good)'}">$${Math.round(pace)} / $${budget}</span></div>
     <div class="bar" style="--pc:${pace>budget?'var(--bad)':'var(--good)'}"><i style="width:${pct}%"></i></div>`}
     ${trip.kind==='mid' ? `<button class="btn primary block" data-act="cart" data-ci="${ci}">Add to Meijer cart</button>` : ((S.locked||{})[c.start]
@@ -903,13 +913,11 @@ function vGroceries(){
       : `<button class="btn primary block" data-act="cart" data-ci="${ci}">Add to Meijer cart</button>
          <div class="row" style="gap:8px"><button class="btn" style="flex:2;padding-inline:6px" data-act="lock" data-s="${c.start}" data-ci="${ci}">Shopping done</button><button class="btn" style="flex:1;padding-inline:4px;font-size:13px" data-act="pull" data-i="${ci}" aria-label="Move shopping a day earlier">‹ Earlier</button><button class="btn" style="flex:1;padding-inline:4px;font-size:13px" data-act="push" data-i="${ci}" aria-label="Move shopping a day later">Later ›</button></div>`)}
     <label class="btn block" for="rcpt-g" style="text-align:center;cursor:pointer">Add a receipt photo${rc?` · ${rc} waiting`:''}</label><input type="file" id="rcpt-g" accept="image/*" data-act="receipt" hidden></div>
-  ${commonCard}
-  ${chk}
   ${(()=>{ const nights = []; for(let d=c.start; d<=c.end; d=add(d,1)) if(isDrinkNight(d)) nights.push(d);
     if(!nights.length) return '';
     return `<details class="card more" style="border-style:dashed;border-top-style:dashed;padding-top:14px"><summary>Drinks this week (${nights.length})</summary>${nights.map(d=>{ const id = S.plan.days[d].d, x = MEALS[id].pair;
       return `<div class="listrow"><span class="b drink" style="width:28px;height:28px">${GLASS[x.glass][1]}</span><span class="grow1"><b>${esc(x.n)}</b><br><span class="small">${nice(d)} · with ${esc(MEALS[id].n)}</span></span></div>${x.buy.map(b=>`<div class="listrow" style="padding:6px 0 6px 38px"><span class="grow1 small">${esc(b)}</span></div>`).join('')}`; }).join('')}<p class="note" style="margin:4px 0 0">Kept separate from the grocery list and food budget.</p></details>`; })()}
-  ${sec}${sp}<p class="note">Prices are rough estimates for the test. Meat rounds to whole 1 lb packs. When you tap Shopping done, the Pantry tab adds the shelf-stable items you bought (oil, rice, peanut butter and so on) and subtracts what this week's recipes use.</p>`;
+  ${sec}${sp}<p class="note">Prices are rough estimates for the test. Checked items are on the grocery list and count toward the total. Meat rounds to whole 1 lb packs. When you tap Shopping done, the Pantry tab adds the shelf-stable items you bought (oil, rice, peanut butter and so on) and subtracts what this week's recipes use.</p>`;
 }
 
 // What a week's list buys for the pantry, used when shopping is marked done.
@@ -1096,6 +1104,7 @@ document.addEventListener('change', e=>{
       .then(()=>{ S.requests.push({text:'Receipt uploaded', from:USER.name, at:new Date().toISOString(), status:'Waiting'}); S.flag.pending = true; render(); toast('Receipt saved. Claude reads it on the next check and updates the pantry, freezer and prices.'); })
       .catch(err=>toast('Could not upload: '+err.message)); }
   else if(a==='fzpri'){ S.freezer[+t.dataset.i].priority = t.value; changed('Freezer'); }
+  else if(a==='listpick'){ S.checks[t.dataset.key] = t.checked; changed('Groceries'); render(); }
   else if(a==='check'){ S.checks[t.dataset.key] = t.checked; save(); t.closest('.listrow').classList.toggle('done', t.checked); }
   else if(a==='prof'){ S.profile = S.profile||{}; const pr = S.profile[t.dataset.p] = S.profile[t.dataset.p]||{goal:'maintain',act:'active'}; pr[t.dataset.f] = t.dataset.f==='wt' ? parseFloat(t.value)||'' : t.value;
     if(autoMacros(t.dataset.p)){ changed('Macros'); render(); toast(`Targets updated for ${NAMES[t.dataset.p]}.`); } else save(); }
@@ -1145,8 +1154,8 @@ function cartSheet(ci){
   const lines = [];
   tmp.querySelectorAll('.card').forEach(card=>{
     const head = card.querySelector('.eyebrow'); if(!head) return; const h = head.textContent.trim();
-    if(/Drinks|Check before|Probably have/.test(h)) return;
-    const items = [...card.querySelectorAll('.listrow')].map(r=>{ const n = r.querySelector('.grow1 > span, .grow1'); const q = r.querySelector('.q'); return n ? '• '+n.textContent.trim().split('\n')[0]+(q?' — '+q.textContent.trim().split('$')[0].trim():'') : ''; }).filter(Boolean);
+    if(/Drinks|Check before|Probably have|Compare|Estimated/i.test(h)) return;
+    const items = [...card.querySelectorAll('.listrow:not(.off)')].map(r=>{ const n = r.querySelector('.grow1 > span:first-child') || r.querySelector('.grow1'); const q = r.querySelector('.q'); return n ? '• '+n.textContent.trim().split('\n')[0]+(q?' — '+q.textContent.trim().split('$')[0].trim():'') : ''; }).filter(Boolean);
     if(items.length) lines.push(h, ...items, '');
   });
   const txt = lines.join('\n').trim();
