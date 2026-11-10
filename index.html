@@ -267,7 +267,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-09i';
+const APP_VERSION = '2026-11-09j';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken'};
@@ -411,6 +411,8 @@ function sync(){
 function changed(tab){ S.flag = {pending:true, at:new Date().toISOString(), tab}; save(); updateDot(); }
 
 const stapleOf = f => S.spices.find(x=>x.food===f);
+// Produce that keeps a week, so it never needs the midweek fresh trip.
+const KEEPS = ['redpot','sweetpot','onion','carrots','apple','bellpep','greenbeans'];
 const COMMON = ['eggs','milk','wholemilk','creamer','cheddar','banana','apple'];
 // Never bought: marked noBuy in Foods, or "Never" in the Pantry tab's Buy? column (beef tallow, homemade rubs, protein powder).
 const neverBuy = f => !!((FOODS[f]&&FOODS[f].noBuy) || (stapleOf(f)||{}).buy==='Never');
@@ -569,12 +571,12 @@ function needsRange(start,end,shopWeek,noCarry){
     const day = S.plan.days[d]; if(!day) continue;
     Object.keys(KEY_PERSONS).forEach(k=>{
       if(isFlex(d,k)) return;
-      if(noCarry && isCarry(d,k) && getRun(d,k)[0] < start) return;
+      if((noCarry || shopWeek) && isCarry(d,k) && getRun(d,k)[0] < start) return; // leftovers of a batch made before this range
       if(noCarry && d>end && !(isCarry(d,k) && getRun(d,k)[0] <= end)) return;
       if(shopWeek && d===start && MORNING.includes(k)) return;
       if(shopWeek && d===last && !MORNING.includes(k)) return;
       const m = MEALS[day[k]]; meals.add(day[k]); (m.spices||[]).forEach(s=>spices.add(s));
-      eaters(d,k).forEach(p=>m.comps.forEach(cc=>{ const r = raw(d,p,cc); need[cc[0]] = (need[cc[0]]||0)+r; if(shopWeek && d>mid && FOODS[cc[0]].cat==='Produce') late[cc[0]] = (late[cc[0]]||0)+r; if(FOODS[cc[0]].pantry) spices.add(FOODS[cc[0]].pantry); }));
+      eaters(d,k).forEach(p=>m.comps.forEach(cc=>{ const r = raw(d,p,cc); need[cc[0]] = (need[cc[0]]||0)+r; if(shopWeek && d>mid && FOODS[cc[0]].cat==='Produce' && !KEEPS.includes(cc[0])) late[cc[0]] = (late[cc[0]]||0)+r; if(FOODS[cc[0]].pantry) spices.add(FOODS[cc[0]].pantry); }));
     });
   }
   return {need, late, spices, meals, mid};
@@ -872,7 +874,7 @@ function vGroceries(){
   const sp = buySp.length ? `<div class="card"><div class="eyebrow">Seasonings</div>${buySp.map(x=>cbox(ci+'|sp-'+x.id, `<span class="grow1">${esc(x.n)}</span><span class="q">1<br><span class="money muted">$3.49</span></span>`)).join('')}</div>` : '';
   const rc = S.requests.filter(r=>/^Receipt/.test(r.text||'') && r.status!=='Done').length;
   const noBudget = !!(S.settings.budgetFrom && c.start.slice(0,7) < S.settings.budgetFrom);
-  const tripNote = trip.kind==='mid' ? 'Midweek fresh trip: produce for the second half of the week, so it stays fresh.' : `${esc(S.settings.store)} · covers ${nice(c.start)} dinner through ${nice(add(c.end,1))} lunch`;
+  const tripNote = trip.kind==='mid' ? 'Midweek fresh trip: produce for the second half of the week, so it stays fresh.' : `${esc(S.settings.store)} · covers ${nice(c.start)} dinner through ${c.end<S.plan.end ? nice(add(c.end,1))+' lunch' : nice(S.plan.end)+' (end of the plan)'}`;
   return `<h2 style="font-size:22px">Shopping</h2>${tripBar}
   <p class="note" style="margin:-4px 0 0;text-align:center">${tripNote}</p>
   ${compareCard([].concat(...Object.values(rows), common.filter(r=>!haveIt(r.f))), ci)}<div class="card budget"><div class="row between"><span class="eyebrow">Estimated</span><span class="eyebrow">${noBudget?'':'Monthly pace'}</span></div>
