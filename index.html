@@ -267,10 +267,10 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-09l';
+const APP_VERSION = '2026-11-09m';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
-const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken'};
+const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
 const GLASS = {
   red:['Red wine glass','<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h10l-.4 5.5a4.6 4.6 0 0 1-9.2 0z"/><path d="M7.5 7.5h9a4.6 4.6 0 0 1-9 0z" fill="currentColor" stroke="none"/><path d="M12 13v7M8.5 21h7"/></svg>'],
   white:['White wine glass','<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 2.5h7l-.3 6.5a3.2 3.2 0 0 1-6.4 0z"/><path d="M8.8 7h6.4l-.1 2a3.2 3.2 0 0 1-6.2 0z" fill="currentColor" stroke="none" opacity=".45"/><path d="M12 12.2V20M8.5 21h7"/></svg>'],
@@ -612,7 +612,7 @@ const HH = {
   avocado:[140,'avocado','avocados',.25], eggs:[50,'egg','eggs',1], yogurt:[245,'cup','cups',.25], cottage:[226,'cup','cups',.25], cheddar:[113,'cup','cups',.25],
   feta:[150,'cup','cups',.25], creamer:[15,'tbsp','tbsp',.5], wholemilk:[244,'cup','cups',.25], tallow:[13,'tbsp','tbsp',.5], milk:[244,'cup','cups',.25], banana:[118,'banana','bananas',.5], peanutbutter:[16,'tbsp','tbsp',.5], sourdough:[50,'slice','slices',.5], tsausage:[454,'lb','lb',1,true], bacon:[14,'slice','slices',1], hashbrowns:[80,'cup','cups',.5],
   tortilla:[45,'tortilla','tortillas',1], emuffin:[57,'English muffin','English muffins',1], chia:[12,'tbsp','tbsp',.5], strawberries:[150,'cup sliced','cups sliced',.25],
-  stewmeat:[454,'lb','lb',1,true], bellpep:[150,'bell pepper','bell peppers',.5], corn:[165,'cup','cups',.25], carrots:[61,'medium carrot','medium carrots',.5], onion:[110,'medium onion','medium onions',.5], broth:[240,'cup','cups',.25], mixedveg:[134,'cup','cups',.25], butter:[14,'tbsp','tbsp',.5]
+  stewmeat:[454,'lb','lb',1,true], bellpep:[150,'bell pepper','bell peppers',.5], bbqsauce:[280,'cup','cups',.25], corn:[165,'cup','cups',.25], carrots:[61,'medium carrot','medium carrots',.5], onion:[110,'medium onion','medium onions',.5], broth:[240,'cup','cups',.25], mixedveg:[134,'cup','cups',.25], butter:[14,'tbsp','tbsp',.5]
 };
 function frac(n){ const w = Math.floor(n), r = Math.round((n-w)*4)/4, f = {0:'',.25:'¼',.5:'½',.75:'¾',1:''}[r]; const W = r===1 ? w+1 : w; return (W||(f?'':'0'))+(W&&f?' ':'')+f; }
 // Scale-first amounts: grams, plus ounces once it's an ounce or more.
