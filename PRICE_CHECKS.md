@@ -13,11 +13,12 @@ The app and the computer talk through two keys on the Data tab of the Meal Prep 
 }}
 ```
 
-- Tapping **Compare cost** locks the checked items into `items` with status `waiting`.
-- Tapping **Build … cart** adds `cart` with status `waiting`. The computer fills that store's cart for
+- Tapping **Compare cost** (later **Recalculate**) snapshots the checked items into `items` with status `waiting`.
+  The list is frozen only while calculating; after that it can change and be recalculated.
+- Tapping **Build … cart** refreshes `items` to the currently checked items and adds `cart` with status `waiting`. The computer fills that store's cart for
   every item in `items` (store/generic brands unless the Pantry tab's "Name brand only" says otherwise),
   then sets `cart.status` to `done` and can leave a short `note` (e.g. "2 items out of stock").
-- **Unlock list** deletes the job.
+- **Cancel** (while calculating) deletes the job.
 
 ## `prices` (written by the computer)
 

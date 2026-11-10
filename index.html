@@ -268,7 +268,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-09t';
+const APP_VERSION = '2026-11-09u';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -787,18 +787,24 @@ function samplePrice(f, base, store, mult){ return Math.round(base*mult*(0.75 + 
 const PICKUP = ['Meijer','Kroger','Target','Aldi pickup'];
 function compareCard(items, trip){
   const jobs = S.priceJobs||{}, job = jobs[trip.date], prices = S.prices||{};
-  if(job && job.items) items = job.items.map(x=>({f:x.f, F:FOODS[x.f]||{n:x.n, pl:x.pl, price:0}, packs:x.packs, cost:x.cost||0}));
-  else items = items.filter(r=>r.packs>0).map(r=>({f:r.f.replace(/-mid$/,''), F:r.F, packs:r.packs, cost:r.cost}));
-  if(!items.length) return '';
-  const real = items.some(r=>PICKUP.some(s=>(prices[s]||{})[r.f]));
+  const calc = job && job.status!=='done', cart = job && job.cart;
+  // Only the checked items are priced.
+  items = items.filter(r=>r.packs>0).map(r=>({f:r.f.replace(/-mid$/,''), F:r.F, packs:r.packs, cost:r.cost}));
+  const btn = calc
+    ? `<button class="btn primary block" disabled style="opacity:.5">Compare cost</button>`
+    : `<button class="btn primary block" data-act="compare" data-trip="${trip.date}">${job?'Recalculate':'Compare cost'}</button>`;
+  // Collapsed until a price check has been asked for.
+  if(!job) return `<div class="card"><div class="eyebrow">Compare stores</div>${btn}</div>`;
+  if(calc) return `<div class="card"><div class="eyebrow">Compare stores</div><div class="status" style="margin-bottom:8px"><span style="flex:1"><b>Calculating…</b> Looking up prices for ${job.items.length} checked items. Results show up here in a few minutes.</span><button class="btn" style="padding:6px 12px" data-act="unlocklist" data-trip="${trip.date}">Cancel</button></div>${btn}</div>`;
+  if(!items.length) return `<div class="card"><div class="eyebrow">Compare stores</div><p class="note" style="margin:0 0 8px">Check some items first.</p>${btn}</div>`;
   const lineP = (store, r) => {
-    if(!real){ const st = STORES.find(x=>x[0]===store); return samplePrice(r.f, r.cost, store, st[2]); }
     if(store==='Aldi in store'){ const a = (prices['Aldi pickup']||{})[r.f]; return a ? Math.round(a.p*r.packs*0.88*100)/100 : null; }
     const x = (prices[store]||{})[r.f]; return x ? Math.round(x.p*r.packs*100)/100 : null; };
   const st = STORES.map(([name,chain])=>{ const lines = items.map(r=>({r, p:lineP(name, r)})); const priced = lines.filter(l=>l.p!=null);
     return {name, chain, lines, total:priced.reduce((a,x)=>a+x.p,0), missing:lines.length-priced.length}; });
   const low = {}; items.forEach((r,i)=>{ const v = st.map(x=>x.lines[i].p).filter(p=>p!=null); low[r.f] = v.length ? Math.min(...v) : null; });
-  // Recommendation compares pickup orders (only stores that priced everything); Aldi in store is its own option.
+  const unpriced = items.filter(r=>!PICKUP.some(s=>(prices[s]||{})[r.f])).length;
+  // Recommendation compares pickup orders that priced everything; Aldi in store is its own option.
   const pick = st.filter(x=>x.name!=='Aldi in store' && !x.missing), inStore = st.find(x=>x.name==='Aldi in store');
   let rec = '', goIn = '', best = null;
   if(pick.length){
@@ -811,23 +817,19 @@ function compareCard(items, trip){
     rec = !pair || save < 1 ? `<b>Stick with ${esc(best.name)}.</b> Splitting into two orders wouldn't save anything.`
       : save >= 10 ? `<b>Split it: ${esc(pair.a.name)} (${pair.na} items) + ${esc(pair.b.name)} (${pair.nb} items).</b> Saves about $${save.toFixed(2)} vs. all at ${esc(best.name)}.`
       : `<b>Stick with ${esc(best.name)}.</b> Splitting between ${esc(pair.a.name)} and ${esc(pair.b.name)} only saves $${save.toFixed(2)}, probably not worth a second stop.`;
-    goIn = inStore && !inStore.missing && best.total - inStore.total >= 1 ? `<div class="small" style="margin-top:6px">Or shop Aldi in person: about $${inStore.total.toFixed(2)}${real?' (estimated)':''}, roughly $${(best.total-inStore.total).toFixed(2)} less than ${esc(best.name)}${/pickup/.test(best.name)?'':' pickup'}.</div>` : '';
-  } else rec = 'Some stores are still missing prices.';
-  const key = 'cmp'+trip.date, done = job && job.status==='done', cart = job && job.cart;
+    goIn = inStore && !inStore.missing && best.total - inStore.total >= 1 ? `<div class="small" style="margin-top:6px">Or shop Aldi in person: about $${inStore.total.toFixed(2)} (estimated), roughly $${(best.total-inStore.total).toFixed(2)} less than ${esc(best.name)}${/pickup/.test(best.name)?'':' pickup'}.</div>` : '';
+  } else rec = 'Some items still need prices. Tap Recalculate.';
+  const key = 'cmp'+trip.date, cartBusy = cart && cart.status!=='done';
   const rows = st.slice().sort((a,b)=>(a.missing-b.missing)||(a.total-b.total)).map(x=>`<details class="cmp" ${ui.cmpOpen===x.name+key?'open':''}><summary data-act="cmpopen" data-k="${esc(x.name+key)}"><span class="grow1"><b>${esc(x.name)}</b>${x===best?' <span class="pill good">Cheapest pickup</span>':''}${x.missing?` <span class="pill warn">${x.missing} not priced</span>`:''}</span><span class="money" style="margin-left:auto;font-size:17px">$${x.total.toFixed(2)}</span></summary>
-    ${x.lines.map(l=>`<div class="listrow" style="padding:6px 0"><span class="grow1">${esc(l.r.F.n)}<br><span class="small muted">${esc(l.r.packs+' × '+(l.r.F.pl||''))}${real&&x.name!=='Aldi in store'&&(prices[x.name]||{})[l.r.f]?' · '+esc((prices[x.name][l.r.f].name||'').slice(0,40)):''}</span></span><span class="money" style="${l.p!=null&&l.p===low[l.r.f]?'color:var(--good);font-weight:700':''}">${l.p==null?'—':'$'+l.p.toFixed(2)}</span></div>`).join('')}
-    ${done && PICKUP.includes(x.name) && !(cart && cart.status==='waiting') ? `<button class="btn primary block" style="margin:6px 0 10px" data-act="buildcart" data-trip="${trip.date}" data-store="${esc(x.name)}">Build ${esc(x.name.replace(' pickup',''))} cart</button>` : ''}</details>`).join('');
-  const asOf = real ? (()=>{ const ds_ = []; PICKUP.forEach(s=>items.forEach(r=>{ const x=(prices[s]||{})[r.f]; if(x&&x.at) ds_.push(x.at); })); ds_.sort(); return ds_.length ? `Prices as of ${nice(ds_[0].slice(0,10))}` : ''; })() : '';
-  let status;
-  if(!job) status = `<button class="btn primary block" data-act="compare" data-trip="${trip.date}">Compare cost</button><p class="note" style="margin:4px 0 0">Locks the checked items and asks the computer to look up real prices at each store. Takes a few minutes.</p>`;
-  else if(job.status!=='done') status = `<div class="status"><span style="flex:1"><b>Checking prices…</b> Requested ${job.by?esc(job.by)+' · ':''}${fmtTime(job.at)}. Results show up here.</span><button class="btn" style="padding:6px 12px" data-act="unlocklist" data-trip="${trip.date}">Cancel</button></div>`;
-  else if(cart && cart.status!=='done') status = `<div class="status"><span style="flex:1"><b>Building your ${esc(cart.store.replace(' pickup',''))} cart…</b> Requested ${fmtTime(cart.at)}.</span></div>`;
-  else if(cart) status = `<div class="status"><span style="flex:1"><b>${esc(cart.store.replace(' pickup',''))} cart is ready.</b> Open the ${esc(cart.store.replace(' pickup',''))} app to review and submit.${cart.note?' '+esc(cart.note):''}</span></div><button class="btn block" style="margin-top:6px" data-act="unlocklist" data-trip="${trip.date}">Unlock list</button>`;
-  else status = `<p class="note" style="margin:0">List locked. Open a store and tap Build cart, or</p><button class="btn block" style="margin-top:6px" data-act="unlocklist" data-trip="${trip.date}">Unlock list to change it</button>`;
-  return `<div class="card"><div class="eyebrow">Compare stores ${real?`<span class="pill good">${esc(asOf)}</span>`:'<span class="pill warn">Sample prices</span>'}</div>
-    <div class="banner prep" style="margin:6px 0 8px"><div>${rec}${goIn}</div></div>${rows}
-    <div style="margin-top:8px">${status}</div>
-    <p class="note" style="margin:6px 0 0">${real?'Real store prices from the computer. Aldi in store is estimated about 12% under Aldi pickup.':'Sample prices until you tap Compare cost.'} Green = lowest price for that item.</p></div>`;
+    ${x.lines.map(l=>`<div class="listrow" style="padding:6px 0"><span class="grow1">${esc(l.r.F.n)}<br><span class="small muted">${esc(l.r.packs+' × '+(l.r.F.pl||''))}${x.name!=='Aldi in store'&&(prices[x.name]||{})[l.r.f]?' · '+esc((prices[x.name][l.r.f].name||'').slice(0,40)):''}</span></span><span class="money" style="${l.p!=null&&l.p===low[l.r.f]?'color:var(--good);font-weight:700':''}">${l.p==null?'—':'$'+l.p.toFixed(2)}</span></div>`).join('')}
+    ${PICKUP.includes(x.name) && !x.missing && !cartBusy ? `<button class="btn primary block" style="margin:6px 0 10px" data-act="buildcart" data-trip="${trip.date}" data-store="${esc(x.name)}">Build ${esc(x.name.replace(' pickup',''))} cart</button>` : ''}</details>`).join('');
+  const asOf = (()=>{ const ds_ = []; PICKUP.forEach(s=>items.forEach(r=>{ const x=(prices[s]||{})[r.f]; if(x&&x.at) ds_.push(x.at); })); ds_.sort(); return ds_.length ? `Prices as of ${nice(ds_[0].slice(0,10))}` : ''; })();
+  const cartLine = !cart ? '' : cartBusy ? `<div class="status" style="margin-top:8px"><span style="flex:1"><b>Building your ${esc(cart.store.replace(' pickup',''))} cart…</b></span></div>`
+    : `<div class="status" style="margin-top:8px"><span style="flex:1"><b>${esc(cart.store.replace(' pickup',''))} cart is ready.</b> Open the ${esc(cart.store.replace(' pickup',''))} app to review and submit.${cart.note?' '+esc(cart.note):''}</span></div>`;
+  return `<div class="card"><div class="eyebrow">Compare stores ${asOf?`<span class="pill good">${esc(asOf)}</span>`:''}</div>
+    <div class="banner prep" style="margin:6px 0 8px"><div>${rec}${goIn}${unpriced?`<div class="small" style="margin-top:6px">${unpriced} checked item${unpriced>1?'s have':' has'} no price yet. Recalculate to look ${unpriced>1?'them':'it'} up.</div>`:''}</div></div>${rows}${cartLine}
+    <div style="margin-top:8px">${btn}</div>
+    <p class="note" style="margin:6px 0 0">Only checked items are priced. Green = lowest price for that item. Aldi in store is estimated about 12% under Aldi pickup.</p></div>`;
 }
 // One shopping week's list: rows by category (Midweek = the fresh trip), pantry/freezer checks and seasonings.
 function groceryData(ci){
@@ -892,7 +894,7 @@ function vGroceries(){
   // Items you usually have (milk, eggs…) and close calls start unchecked; everything else starts checked.
   const lkey = r => 'L|'+trip.date+'|'+r.f.replace(/-mid$/,'');
   const onList = r => { const v = S.checks[lkey(r)]; return v===undefined ? !!r.defOn : v; };
-  const locked = !!(S.priceJobs||{})[trip.date];
+  const locked = !!((S.priceJobs||{})[trip.date] && S.priceJobs[trip.date].status!=='done');
   Object.values(rows).forEach(a=>a.forEach(r=>{ r.defOn = r.packs>0; }));
   common.forEach(r=>{ r.defOn = false; r.usual = true; (rows[r.F.cat] = rows[r.F.cat]||[]).push(r); });
   checks.forEach(k=>{ if(k.kind==='staple'){ const F = FOODS[k.f]; if(![].concat(...Object.values(rows)).some(r=>r.f===k.f)) (rows[F.cat] = rows[F.cat]||[]).push({f:k.f, F, need:k.g, packs:1, cost:F.price, defOn:false, close:'pantry'}); }
@@ -1101,10 +1103,10 @@ document.addEventListener('click', e=>{
   else if(a==='goal'){ S.profile = S.profile||{}; const pr = S.profile[t.dataset.p] = S.profile[t.dataset.p]||{wt:'',act:'active'}; pr.goal = t.dataset.v;
     if(autoMacros(t.dataset.p)){ changed('Macros'); toast(`Targets updated for ${NAMES[t.dataset.p]}.`); } else { save(); toast('Enter a weight to fill in the targets.'); } render(); }
   else if(a==='compare'){ const T = upcomingTrips(), tr = T.find(x=>x.date===t.dataset.trip); if(!tr) return;
-    const items = (ui._picked||[]).map(r=>({f:r.f.replace(/-mid$/,''), n:r.F.n, pl:r.F.pl, packs:r.packs, cost:r.cost}));
+    const items = (ui._picked||[]).filter(r=>r.packs>0).map(r=>({f:r.f.replace(/-mid$/,''), n:r.F.n, pl:r.F.pl, packs:r.packs, cost:r.cost}));
     S.priceJobs = S.priceJobs||{}; S.priceJobs[tr.date] = {status:'waiting', at:new Date().toISOString(), by:USER.name, items};
     changed('Price check'); render(); toast('Price check requested. Results show up here in a few minutes.'); }
-  else if(a==='buildcart'){ const j = (S.priceJobs||{})[t.dataset.trip]; if(!j) return; j.cart = {store:t.dataset.store, status:'waiting', at:new Date().toISOString(), by:USER.name}; changed('Build cart'); render(); toast(`Building your ${t.dataset.store.replace(' pickup','')} cart.`); }
+  else if(a==='buildcart'){ const j = (S.priceJobs||{})[t.dataset.trip]; if(!j) return; j.items = (ui._picked||[]).filter(r=>r.packs>0).map(r=>({f:r.f.replace(/-mid$/,''), n:r.F.n, pl:r.F.pl, packs:r.packs, cost:r.cost})); j.cart = {store:t.dataset.store, status:'waiting', at:new Date().toISOString(), by:USER.name}; changed('Build cart'); render(); toast(`Building your ${t.dataset.store.replace(' pickup','')} cart.`); }
   else if(a==='unlocklist'){ if(S.priceJobs) delete S.priceJobs[t.dataset.trip]; changed('Price check'); render(); }
   else if(a==='cmpopen'){ e.preventDefault(); ui.cmpOpen = ui.cmpOpen===t.dataset.k ? null : t.dataset.k; render(); }
   else if(a==='mopen'){ ui.mealOpen[t.dataset.k] = !ui.mealOpen[t.dataset.k]; const sc = window.scrollY; render(); window.scrollTo(0,sc); }
