@@ -268,7 +268,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-09v';
+const APP_VERSION = '2026-11-09w';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -777,6 +777,32 @@ function vDay(){
     slot('Breakfast',['c','kb','yb']) + slot('Lunch',['l']) + slot('Dinner',['d']) + slot('Snacks',['ks','ys']);
 }
 
+// ---------- Shopping stats (from shopLog, ratings and the plan) ----------
+function statsCard(){
+  const log = (S.shopLog||[]).filter(x=>x.store);
+  const money = v => '$'+(Math.round(v*100)/100).toFixed(2);
+  const bar = (label, n, of, extra) => `<div style="margin:6px 0"><div class="row between small"><span>${esc(label)}</span><span class="muted">${extra||''}</span></div><div class="bar" style="--pc:var(--accent)"><i style="width:${of?Math.round(n/of*100):0}%"></i></div></div>`;
+  let body = '';
+  if(!log.length) body = `<p class="note" style="margin:4px 0 0">Stats start once you build your first cart: which store you use, whether you follow the recommendation, and how much comparing saves.</p>`;
+  else {
+    const by = {}; log.forEach(x=>{ by[x.store] = (by[x.store]||0)+1; });
+    const stores = Object.keys(by).sort((a,b)=>by[b]-by[a]), usual = stores[0];
+    const followed = log.filter(x=>x.recommended && x.recommended===x.store).length, withRec = log.filter(x=>x.recommended).length;
+    const costs = log.filter(x=>x.cost!=null), avg = costs.reduce((a,x)=>a+x.cost,0)/(costs.length||1);
+    // Savings vs. putting every order at your usual store.
+    const saved = log.reduce((a,x)=>a + ((x.totals||{})[usual]!=null && x.cost!=null ? (x.totals[usual]-x.cost) : 0), 0);
+    const actual = log.filter(x=>x.actual!=null && x.cost!=null), drift = actual.length ? actual.reduce((a,x)=>a+(x.actual-x.cost),0)/actual.length : null;
+    body = `<div class="small muted" style="margin:2px 0 6px">${log.length} order${log.length>1?'s':''} since ${nice(log.map(x=>x.at.slice(0,10)).sort()[0])}</div>
+      <div style="font-weight:700;margin-top:6px">Where you shop</div>${stores.map(st=>bar(st, by[st], log.length, `${by[st]} · ${Math.round(by[st]/log.length*100)}%`)).join('')}
+      <div class="listrow" style="padding:6px 0"><span class="grow1">Followed the recommendation</span><span class="money">${followed} of ${withRec}</span></div>
+      <div class="listrow" style="padding:6px 0"><span class="grow1">Average order</span><span class="money">${money(avg)}</span></div>
+      <div class="listrow" style="padding:6px 0"><span class="grow1">Saved vs. always ${esc(usual.replace(' pickup',''))}</span><span class="money" style="color:${saved>=0?'var(--good)':'var(--bad)'}">${money(saved)}</span></div>
+      ${drift!=null?`<div class="listrow" style="padding:6px 0"><span class="grow1">Receipts vs. estimate (avg)</span><span class="money">${drift>=0?'+':''}${money(drift)}</span></div>`:''}`;
+  }
+  const liked = Object.keys(S.ratings||{}).filter(id=>S.ratings[id]>0 && MEALS[id]), nope = Object.keys(S.ratings||{}).filter(id=>S.ratings[id]<0 && MEALS[id]);
+  const meals = liked.length||nope.length ? `<div style="font-weight:700;margin-top:10px">Meals</div>${liked.length?`<div class="small" style="margin:4px 0">👍 ${liked.map(id=>esc(MEALS[id].n)).join(', ')}</div>`:''}${nope.length?`<div class="small" style="margin:4px 0">👎 ${nope.map(id=>esc(MEALS[id].n)).join(', ')}</div>`:''}` : '';
+  return `<details class="card more" ${ui.statsOpen?'open':''}><summary data-act="statsopen">Shopping stats</summary>${body}${meals}</details>`;
+}
 // ---------- Store comparison (sample prices until real store prices are connected) ----------
 const STORES = [['Meijer','Meijer',1.00],['Kroger','Kroger',1.04],['Target','Target',1.09],['Aldi pickup','Aldi',0.92],['Aldi in store','Aldi',0.80]];
 function hashN(str){ let h = 2166136261; for(let i=0;i<str.length;i++){ h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return ((h>>>0)%1000)/1000; }
@@ -951,7 +977,7 @@ function vGroceries(){
     if(!nights.length) return '';
     return `<details class="card more" style="border-style:dashed;border-top-style:dashed;padding-top:14px"><summary>Drinks this week (${nights.length})</summary>${nights.map(d=>{ const id = S.plan.days[d].d, x = MEALS[id].pair;
       return `<div class="listrow"><span class="b drink" style="width:28px;height:28px">${GLASS[x.glass][1]}</span><span class="grow1"><b>${esc(x.n)}</b><br><span class="small">${nice(d)} · with ${esc(MEALS[id].n)}</span></span></div>${x.buy.map(b=>`<div class="listrow" style="padding:6px 0 6px 38px"><span class="grow1 small">${esc(b)}</span></div>`).join('')}`; }).join('')}<p class="note" style="margin:4px 0 0">Kept separate from the grocery list and food budget.</p></details>`; })()}
-  ${sec}${sp}<p class="note">Prices are rough estimates for the test. Checked items are on the grocery list and count toward the total. Meat rounds to whole 1 lb packs. When you tap Shopping done, the Pantry tab adds the shelf-stable items you bought (oil, rice, peanut butter and so on) and subtracts what this week's recipes use.</p>`;
+  ${sec}${sp}${statsCard()}<p class="note">Prices are rough estimates for the test. Checked items are on the grocery list and count toward the total. Meat rounds to whole 1 lb packs. When you tap Shopping done, the Pantry tab adds the shelf-stable items you bought (oil, rice, peanut butter and so on) and subtracts what this week's recipes use.</p>`;
 }
 
 // What a week's list buys for the pantry, used when shopping is marked done.
@@ -1110,6 +1136,7 @@ document.addEventListener('click', e=>{
   else if(a==='buildcart'){ const j = (S.priceJobs||{})[t.dataset.trip]; if(!j) return; j.items = (ui._picked||[]).filter(r=>r.packs>0).map(r=>({f:r.f.replace(/-mid$/,''), n:r.F.n, pl:r.F.pl, packs:r.packs, cost:r.cost})); j.cart = {store:t.dataset.store, status:'waiting', at:new Date().toISOString(), by:USER.name};
     (S.shopLog = S.shopLog||[]).push({trip:t.dataset.trip, at:j.cart.at, by:USER.name, store:t.dataset.store, recommended:(ui._cmp||{}).best||null, totals:(ui._cmp||{}).totals||{}, items:j.items.length, cost:((ui._cmp||{}).totals||{})[t.dataset.store]||null}); changed('Build cart'); render(); toast(`Building your ${t.dataset.store.replace(' pickup','')} cart.`); }
   else if(a==='unlocklist'){ if(S.priceJobs) delete S.priceJobs[t.dataset.trip]; changed('Price check'); render(); }
+  else if(a==='statsopen'){ e.preventDefault(); ui.statsOpen = !ui.statsOpen; render(); }
   else if(a==='cmpopen'){ e.preventDefault(); ui.cmpOpen = ui.cmpOpen===t.dataset.k ? null : t.dataset.k; render(); }
   else if(a==='mopen'){ ui.mealOpen[t.dataset.k] = !ui.mealOpen[t.dataset.k]; const sc = window.scrollY; render(); window.scrollTo(0,sc); }
   else if(a==='haveit'){ S.haveIt = S.haveIt||{}; S.haveIt[t.dataset.k] = !S.haveIt[t.dataset.k]; changed('Groceries'); render(); }
