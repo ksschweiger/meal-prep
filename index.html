@@ -250,6 +250,7 @@ details.cmp[open] summary::after{transform:rotate(90deg)}
 <script>
 // ---------- Icons ----------
 const I = {
+  chart:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 20h16"/><path d="M7 16v-5M12 16V7M17 16v-8"/></svg>',
   cal:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>',
   day:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>',
   cart:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2.5l2.2 10.5h10.6L20.5 7H6.6"/><circle cx="9.5" cy="19" r="1.4"/><circle cx="17" cy="19" r="1.4"/></svg>',
@@ -268,7 +269,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-09x';
+const APP_VERSION = '2026-11-09y';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -656,13 +657,14 @@ function closeSheet(){ const w = document.getElementById('sheetwrap'); w.hidden 
 const fmtTime = iso => { const d = new Date(iso); return nice(ds(d))+', '+d.toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}); };
 
 // ---------- Views ----------
-const TABS = [['calendar','Calendar',I.cal],['day','Day',I.day],['groceries','Groceries',I.cart],['pantry','Pantry',I.jar],['macros','Macros',I.gauge],['settings','Settings',I.gear]];
+// Day isn't in the tab bar: open a day from the calendar.
+const TABS = [['calendar','Calendar',I.cal],['groceries','Groceries',I.cart],['stats','Stats',I.chart],['pantry','Pantry',I.jar],['macros','Macros',I.gauge],['settings','Settings',I.gear]];
 function render(){
   ui._trips = null;
   applyTallow();
   document.getElementById('tabs').innerHTML = TABS.map(t=>`<button data-act="tab" data-tab="${t[0]}" class="${ui.tab===t[0]?'on':''}" aria-label="${t[1]}">${t[2]}<span>${t[1]}</span></button>`).join('');
   const v = document.getElementById('view');
-  v.innerHTML = '<div class="view">'+({calendar:vCalendar,day:vDay,groceries:vGroceries,pantry:vPantry,macros:vMacros,settings:vSettings}[ui.tab])()+'</div>';
+  v.innerHTML = '<div class="view">'+({calendar:vCalendar,day:vDay,stats:vStats,groceries:vGroceries,pantry:vPantry,macros:vMacros,settings:vSettings}[ui.tab])()+'</div>';
   updateDot();
 }
 
@@ -811,8 +813,9 @@ function statsCard(){
   }
   const liked = Object.keys(S.ratings||{}).filter(id=>S.ratings[id]>0 && MEALS[id]), nope = Object.keys(S.ratings||{}).filter(id=>S.ratings[id]<0 && MEALS[id]);
   const meals = liked.length||nope.length ? `<div style="background:var(--sunk);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:8px"><div class="small muted">Meals you rated</div>${liked.length?`<div class="small" style="margin:4px 0">👍 ${liked.map(id=>esc(MEALS[id].n)).join(', ')}</div>`:''}${nope.length?`<div class="small" style="margin:4px 0">👎 ${nope.map(id=>esc(MEALS[id].n)).join(', ')}</div>`:''}</div>` : '';
-  return `<details class="card more" ${ui.statsOpen?'open':''}><summary data-act="statsopen">Shopping stats</summary>${body}${meals}</details>`;
+  return `<h2 style="font-size:22px">Stats</h2><div class="card">${body}</div>${meals}`;
 }
+const vStats = () => statsCard();
 // ---------- Store comparison (sample prices until real store prices are connected) ----------
 const STORES = [['Meijer','Meijer',1.00],['Kroger','Kroger',1.04],['Target','Target',1.09],['Aldi pickup','Aldi',0.92],['Aldi in store','Aldi',0.80]];
 function hashN(str){ let h = 2166136261; for(let i=0;i<str.length;i++){ h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return ((h>>>0)%1000)/1000; }
@@ -987,7 +990,7 @@ function vGroceries(){
     if(!nights.length) return '';
     return `<details class="card more" style="border-style:dashed;border-top-style:dashed;padding-top:14px"><summary>Drinks this week (${nights.length})</summary>${nights.map(d=>{ const id = S.plan.days[d].d, x = MEALS[id].pair;
       return `<div class="listrow"><span class="b drink" style="width:28px;height:28px">${GLASS[x.glass][1]}</span><span class="grow1"><b>${esc(x.n)}</b><br><span class="small">${nice(d)} · with ${esc(MEALS[id].n)}</span></span></div>${x.buy.map(b=>`<div class="listrow" style="padding:6px 0 6px 38px"><span class="grow1 small">${esc(b)}</span></div>`).join('')}`; }).join('')}<p class="note" style="margin:4px 0 0">Kept separate from the grocery list and food budget.</p></details>`; })()}
-  ${sec}${sp}${statsCard()}<p class="note">Prices are rough estimates for the test. Checked items are on the grocery list and count toward the total. Meat rounds to whole 1 lb packs. When you tap Shopping done, the Pantry tab adds the shelf-stable items you bought (oil, rice, peanut butter and so on) and subtracts what this week's recipes use.</p>`;
+  ${sec}${sp}<p class="note">Prices are rough estimates for the test. Checked items are on the grocery list and count toward the total. Meat rounds to whole 1 lb packs. When you tap Shopping done, the Pantry tab adds the shelf-stable items you bought (oil, rice, peanut butter and so on) and subtracts what this week's recipes use.</p>`;
 }
 
 // What a week's list buys for the pantry, used when shopping is marked done.
