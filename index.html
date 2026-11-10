@@ -267,7 +267,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-09m';
+const APP_VERSION = '2026-11-09n';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -578,7 +578,7 @@ function needsRange(start,end,shopWeek,noCarry){
       if(shopWeek && d===last && !MORNING.includes(k)) return;
       const m = MEALS[day[k]]; meals.add(day[k]); (m.spices||[]).forEach(s=>spices.add(s));
       const mk = day[k]; (when[mk] = when[mk]||{slot:KEY_SLOT[k], days:[]}).days.includes(d) || when[mk].days.push(d);
-      eaters(d,k).forEach(p=>m.comps.forEach(cc=>{ const r = raw(d,p,cc); need[cc[0]] = (need[cc[0]]||0)+r; ((use[cc[0]] = use[cc[0]]||{})[mk] = (use[cc[0]][mk]||0) + r); if(shopWeek && d>mid && FOODS[cc[0]].cat==='Produce' && !KEEPS.includes(cc[0])) late[cc[0]] = (late[cc[0]]||0)+r; if(FOODS[cc[0]].pantry) spices.add(FOODS[cc[0]].pantry); }));
+      eaters(d,k).forEach(p=>m.comps.forEach(cc=>{ const r = raw(d,p,cc); need[cc[0]] = (need[cc[0]]||0)+r; ((use[cc[0]] = use[cc[0]]||{})[mk] = (use[cc[0]][mk]||0) + r); if(shopWeek && between(start,end)>=5 && d>mid && FOODS[cc[0]].cat==='Produce' && !KEEPS.includes(cc[0])) late[cc[0]] = (late[cc[0]]||0)+r; if(FOODS[cc[0]].pantry) spices.add(FOODS[cc[0]].pantry); }));
     });
   }
   return {need, late, spices, meals, mid, use, when};
