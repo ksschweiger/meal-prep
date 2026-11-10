@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#2D6A4C">
+<meta name="theme-color" content="#D9620F">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Meal Prep">
 <title>Schweiger Meal Prep</title>
@@ -13,11 +13,11 @@
 <style>
 /* Layout: phone-first single column, sticky header, fixed bottom tab bar; portions shown as masking-tape container labels */
 :root{
-  --bg:#F2F4EF; --surface:#FFFFFF; --sunk:#E9EDE6; --ink:#1C231F; --muted:#5C6861; --line:#D9E0D8;
-  --accent:#2D6A4C; --accent-ink:#FFFFFF; --accent-soft:#DFEDE4;
+  --bg:#FFFAF3; --surface:#FFFFFF; --sunk:#FFF2E1; --ink:#2B2117; --muted:#7A6856; --line:#F1DFC8;
+  --accent:#D9620F; --accent-ink:#FFFFFF; --accent-soft:#FFE5CF;
   --prep:#B57A0C; --prep-soft:#F7ECD3; --shop:#3A69A8; --shop-soft:#E2EAF6; --thaw:#2A84A0; --thaw-soft:#DBEFF4;
   --k:#3A69A8; --y:#94467F; --l:#BC6418;
-  --good:#2D8A55; --warn:#B57A0C; --bad:#B4463A;
+  --good:#5B9A1A; --warn:#C27F0A; --bad:#B4463A;
   --tape:#F1E5C3; --tape-ink:#4E4019;
   --drink:#8C2C4B; --drink-soft:#F6E1E8; --s-cozy:#C9862A; --s-asian:#B8483B; --s-mexican:#4E8A3C; --s-med:#3A7FA3;
   --display:"Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
@@ -25,20 +25,20 @@
   --mono:"JetBrains Mono", ui-monospace, Menlo, monospace;
 }
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
-  --bg:#111513; --surface:#1A1F1C; --sunk:#232925; --ink:#E6ECE7; --muted:#99A49D; --line:#2D3430;
-  --accent:#72C097; --accent-ink:#0D1A12; --accent-soft:#1E3327;
+  --bg:#17120D; --surface:#211A14; --sunk:#2B231B; --ink:#F6EDE2; --muted:#B5A390; --line:#3B3026;
+  --accent:#FF9A4D; --accent-ink:#24140A; --accent-soft:#3D2614;
   --prep:#E2B04C; --prep-soft:#372D14; --shop:#82A8DC; --shop-soft:#1B283A; --thaw:#6FC1D8; --thaw-soft:#162F37;
   --k:#82A8DC; --y:#D58DC3; --l:#E9A262;
-  --good:#5EC28B; --warn:#E2B04C; --bad:#E57B6F;
+  --good:#A6D65A; --warn:#E2B04C; --bad:#E57B6F;
   --tape:#3A3322; --tape-ink:#EBDAA8;
   --drink:#E58AA8; --drink-soft:#3A1E28; --s-cozy:#E0A24E; --s-asian:#E0776A; --s-mexican:#83C06F; --s-med:#6FB3D6;
   color-scheme:dark }}
 :root[data-theme="dark"]{
-  --bg:#111513; --surface:#1A1F1C; --sunk:#232925; --ink:#E6ECE7; --muted:#99A49D; --line:#2D3430;
-  --accent:#72C097; --accent-ink:#0D1A12; --accent-soft:#1E3327;
+  --bg:#17120D; --surface:#211A14; --sunk:#2B231B; --ink:#F6EDE2; --muted:#B5A390; --line:#3B3026;
+  --accent:#FF9A4D; --accent-ink:#24140A; --accent-soft:#3D2614;
   --prep:#E2B04C; --prep-soft:#372D14; --shop:#82A8DC; --shop-soft:#1B283A; --thaw:#6FC1D8; --thaw-soft:#162F37;
   --k:#82A8DC; --y:#D58DC3; --l:#E9A262;
-  --good:#5EC28B; --warn:#E2B04C; --bad:#E57B6F;
+  --good:#A6D65A; --warn:#E2B04C; --bad:#E57B6F;
   --tape:#3A3322; --tape-ink:#EBDAA8;
   --drink:#E58AA8; --drink-soft:#3A1E28; --s-cozy:#E0A24E; --s-asian:#E0776A; --s-mexican:#83C06F; --s-med:#6FB3D6;
   color-scheme:dark }
@@ -269,7 +269,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-09y';
+const APP_VERSION = '2026-11-09z';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -679,7 +679,7 @@ function vCalendar(){
     else if(day && isFlex(s,'d')) din = `<div class="din cont">Flex</div>`;
     else if(day){
       const meal = MEALS[day.d], run = getRun(s,'d'), first = run[0]===s;
-      din = `<div class="din ${first?'':'cont'}" style="--sc:${STYLE_COLOR[meal.style]||'var(--line)'}">${first?esc(meal.s):'↳ '+esc(meal.s)}</div>`;
+      din = `<div class="din ${first?'':'cont'}" style="--sc:${STYLE_COLOR[meal.style]||'var(--line)'}">${first?esc(meal.s||meal.n):'↳ '+esc(meal.s||meal.n)}</div>`;
     }
     const dr = isDrinkNight(s) ? `<span class="b drink" title="Drink night">${GLASS[MEALS[day.d].pair.glass][1]}</span>` : '';
     const b = dr + (mk.prep?`<span class="b prep" title="Prep day">${I.pot}</span>`:'')+(mk.shop?`<span class="b shop" title="Shop day">${I.cart}</span>`:'')+(mk.thaw?`<span class="b thaw" title="Pull meat from the freezer">${I.snow}</span>`:'');
