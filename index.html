@@ -267,7 +267,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-09h';
+const APP_VERSION = '2026-11-09i';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken'};
@@ -828,17 +828,30 @@ function upcomingTrips(){
     const mainN = Object.keys(g.rows).filter(k=>k!=='Midweek').reduce((a,k)=>a+g.rows[k].length,0) + g.buySp.length;
     if(w.start>=TODAY && w.start<=lim && !(S.locked||{})[w.start] && mainN) out.push({ci, kind:'main', date:w.start});
     if(g.rows.Midweek && g.mid>=TODAY && g.mid<=lim) out.push({ci, kind:'mid', date:g.mid}); });
-  return out.sort((a,b)=>a.date<b.date?-1:1);
+  out.sort((a,b)=>a.date<b.date?-1:1);
+  // Trips on back-to-back days fold into the earlier one.
+  const merged = [];
+  out.forEach(t=>{ const last = merged[merged.length-1];
+    if(last && between(last.date, t.date)<=1) last.parts.push(t); else merged.push({date:t.date, parts:[t]}); });
+  merged.forEach(m=>{ m.ci = m.parts[0].ci; m.kind = m.parts.every(x=>x.kind==='mid') ? 'mid' : 'main'; });
+  return merged;
 }
 function vGroceries(){
   const T = upcomingTrips();
   if(!T.length) return `<h2 style="font-size:22px">Groceries</h2><div class="card muted">Nothing to shop for in the next week.</div>`;
   if(ui.trip==null || ui.trip>=T.length) ui.trip = 0;
-  const trip = T[ui.trip], ci = ui.gc = trip.ci;
-  let {c, need, late, mid, cats, rows, common, checks, haveIt, total, buySp} = groceryData(ci);
-  // Show only this trip's items.
-  if(trip.kind==='mid'){ rows = {Midweek: rows.Midweek}; common = []; checks = []; buySp = []; }
-  else { delete rows.Midweek; }
+  const trip = T[ui.trip], mainPart = trip.parts.find(x=>x.kind==='main') || trip.parts[0], ci = ui.gc = mainPart.ci;
+  let {c, need, late, mid, cats, haveIt} = groceryData(ci);
+  // Gather this trip's items from each part (a main trip and/or a midweek fresh trip folded into it).
+  let rows = {}, common = [], checks = [], buySp = [], total;
+  trip.parts.forEach(pt=>{ const g = groceryData(pt.ci);
+    if(pt.kind==='mid'){ (rows.Midweek = rows.Midweek||[]).push(...g.rows.Midweek); return; }
+    Object.keys(g.rows).forEach(k=>{ if(k!=='Midweek') (rows[k] = rows[k]||[]).push(...g.rows[k]); });
+    common.push(...g.common); checks.push(...g.checks); buySp.push(...g.buySp); });
+  if(trip.kind==='main' && rows.Midweek){ rows.Midweek.forEach(r=>{ (rows[r.F.cat] = rows[r.F.cat]||[]).push(r); }); delete rows.Midweek; }
+  // Same food twice (e.g. weekly + fresh-trip peppers) becomes one line.
+  Object.keys(rows).forEach(k=>{ const by = {}; rows[k] = rows[k].filter(r=>{ const base = r.f.replace(/-mid$/,''), x = by[base];
+    if(!x){ by[base] = r; return true; } x.packs += r.packs; x.cost += r.cost; x.need += r.need; return false; }); });
   total = [].concat(...Object.values(rows)).reduce((a,r)=>a+r.cost,0) + common.filter(r=>!haveIt(r.f)).reduce((a,r)=>a+r.cost,0) + buySp.length*3.49;
   const tripBar = `<div class="row" style="justify-content:center;gap:6px;flex-wrap:wrap">${T.map((x,i)=>`<button class="chip ${i===ui.trip?'on':''}" data-act="trip" data-i="${i}">${nice(x.date)}${x.kind==='mid'?' · fresh':''}</button>`).join('')}</div>`;
   const tspTxt = (id,g) => { const t = g/(G_PER_TSP[id]||2.5); return t>=3 ? frac(Math.max(.25,Math.round(t/3*4)/4))+' tbsp' : frac(Math.max(.25,Math.round(t*4)/4))+' tsp'; };
