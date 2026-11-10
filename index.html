@@ -269,7 +269,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-09z';
+const APP_VERSION = '2026-11-09za';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -1047,6 +1047,7 @@ function vSettings(){
   return `<h2 style="font-size:22px">Settings</h2><div class="card">
     <div class="field"><span class="lbl">Prep days</span><div class="chips">${DOW.map((d,i)=>`<button class="chip ${st.prep.includes(i)?'on':''}" data-act="prepday" data-i="${i}">${d}</button>`).join('')}</div></div>
     <div class="field"><span class="lbl">Shopping days (tap to add or remove)</span><div class="chips">${DOW.map((d,i)=>`<button class="chip ${shopDaysOf().includes(i)?'on':''}" data-act="shopday" data-i="${i}">${d}</button>`).join('')}</div></div>
+    <div class="field"><span class="lbl">Appearance (this phone)</span><div class="seg">${[['auto','Auto'],['light','Light'],['dark','Dark']].map(([v,l])=>`<button class="${(lsGet('mp-theme')||'auto')===v?'on':''}" data-act="theme" data-v="${v}">${l}</button>`).join('')}</div></div>
     <div class="field"><span class="lbl">Weekends</span><div class="seg">${[['sun','Sat planned, Sun dinner only'],['light','Dinner only'],['none','Nothing planned'],['full','Full plan']].map(([v,l])=>`<button class="${st.weekend===v?'on':''}" data-act="weekend" data-v="${v}">${l}</button>`).join('')}</div><span class="note">Weekend meals not planned show as Flex, for leftovers.</span></div>
     <div class="field"><div class="row between"><span class="lbl">Most days in a row for one dinner</span><div class="stepper"><button data-act="set" data-k="maxRun" data-d="-1" aria-label="Fewer">−</button><span>${st.maxRun}</span><button data-act="set" data-k="maxRun" data-d="1" aria-label="More">+</button></div></div></div>
     <div class="field"><div class="row between"><span class="lbl">Plan ready before prep</span><div class="stepper"><button data-act="set" data-k="lead" data-d="-1" aria-label="Fewer days">−</button><span>${st.lead} days</span><button data-act="set" data-k="lead" data-d="1" aria-label="More days">+</button></div></div></div>
@@ -1130,6 +1131,7 @@ document.addEventListener('click', e=>{
   else if(a==='dnav'){ const n = add(ui.sel, +t.dataset.dir); if(S.plan.days[n]){ ui.sel = n; render(); } }
   else if(a==='trip'){ ui.trip = +t.dataset.i; render(); }
   else if(a==='gnav'){ ui.gc = Math.max(0, Math.min(shopWeeks().length-1, ui.gc + +t.dataset.dir)); render(); }
+  else if(a==='theme'){ lsSet('mp-theme', t.dataset.v==='auto'?null:t.dataset.v); applyTheme(); render(); }
   else if(a==='weekend'){ S.settings.weekend = t.dataset.v; changed('Settings'); render(); }
   else if(a==='shopday'){ const i = +t.dataset.i, cur = shopDaysOf().slice(); const nx = cur.includes(i) ? cur.filter(x=>x!==i) : cur.concat(i).sort(); if(!nx.length) return; S.settings.shopDays = nx; S.settings.shopDay = nx[0]; ui.gc = null; changed('Settings'); render(); toast(`Shopping days: ${nx.map(x=>DOW[x]).join(' and ')}. Each trip covers the meals cooked before the next one.`); }
   else if(a==='goList'){ ui.trip = +t.dataset.ti; ui.tab = 'groceries'; render(); window.scrollTo(0,0); }
@@ -1260,6 +1262,11 @@ document.addEventListener('visibilitychange', ()=>{
 setInterval(()=>{ if(!S || !TOKEN || document.visibilityState!=='visible') return;
   const waiting = Object.values(S.priceJobs||{}).some(j=>j.status!=='done' || (j.cart && j.cart.status!=='done'));
   if(waiting && !SYNC_KEYS.some(k=>JSON.stringify(S[k])!==SNAP[k])) boot(); }, 30e3);
+// Light / dark / auto (follows the phone), saved per phone.
+function applyTheme(){ const v = lsGet('mp-theme'); if(v) document.documentElement.dataset.theme = v; else delete document.documentElement.dataset.theme;
+  const dark = v==='dark' || (!v && matchMedia('(prefers-color-scheme: dark)').matches);
+  const m = document.querySelector('meta[name="theme-color"]'); if(m) m.content = dark ? '#211A14' : '#D9620F'; }
+applyTheme();
 start();
 </script>
 </body>
