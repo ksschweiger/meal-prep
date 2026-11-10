@@ -232,6 +232,16 @@ details.cmp[open] summary::after{transform:rotate(90deg)}
 .signin{min-height:70vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center}
 .signin h1{font-size:30px}
 .sync{font-size:12px;color:var(--muted)}
+
+/* Seasonal colors: set by date (see SEASONS). Fall/Thanksgiving = pumpkin, Christmas = red & evergreen. */
+:root[data-season="fall"]{ --accent:#C2560B; --accent-soft:#FBDFC8; --good:#6E8E1E; }
+:root[data-season="xmas"]{ --accent:#B3262E; --accent-soft:#F7DADB; --good:#2F7A3F; --bg:#E8E3DA; --line:#DCCFC0; --sunk:#F7F2EA; }
+@media (prefers-color-scheme: dark){
+  :root[data-season="fall"]:not([data-theme="light"]){ --accent:#FF8F3A; --accent-soft:#3D2412; --good:#B9C95A; }
+  :root[data-season="xmas"]:not([data-theme="light"]){ --accent:#F2626A; --accent-soft:#3A1A1C; --good:#6CC27F; --bg:#0C0A0A; --surface:#2A2222; --sunk:#352B2B; --line:#4E3E3E; }
+}
+:root[data-season="fall"][data-theme="dark"]{ --accent:#FF8F3A; --accent-soft:#3D2412; --good:#B9C95A; }
+:root[data-season="xmas"][data-theme="dark"]{ --accent:#F2626A; --accent-soft:#3A1A1C; --good:#6CC27F; --bg:#0C0A0A; --surface:#2A2222; --sunk:#352B2B; --line:#4E3E3E; }
 </style>
 </head>
 <body>
@@ -269,7 +279,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-09zd';
+const APP_VERSION = '2026-11-09ze';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -1048,6 +1058,7 @@ function vSettings(){
     <div class="field"><span class="lbl">Prep days</span><div class="chips">${DOW.map((d,i)=>`<button class="chip ${st.prep.includes(i)?'on':''}" data-act="prepday" data-i="${i}">${d}</button>`).join('')}</div></div>
     <div class="field"><span class="lbl">Shopping days (tap to add or remove)</span><div class="chips">${DOW.map((d,i)=>`<button class="chip ${shopDaysOf().includes(i)?'on':''}" data-act="shopday" data-i="${i}">${d}</button>`).join('')}</div></div>
     <div class="field"><span class="lbl">Appearance (this phone)</span><div class="seg">${[['auto','Auto'],['light','Light'],['dark','Dark']].map(([v,l])=>`<button class="${(lsGet('mp-theme')||'auto')===v?'on':''}" data-act="theme" data-v="${v}">${l}</button>`).join('')}</div></div>
+    <div class="field"><span class="lbl">Seasonal colors</span><div class="seg">${[['on','On'],['off','Off']].map(([v,l])=>`<button class="${(lsGet('mp-season')==='off'?'off':'on')===v?'on':''}" data-act="season" data-v="${v}">${l}</button>`).join('')}</div><span class="note">Fall and Thanksgiving through Thanksgiving Day, then Christmas through the new year.</span></div>
     <div class="field"><span class="lbl">Weekends</span><div class="seg">${[['sun','Sat planned, Sun dinner only'],['light','Dinner only'],['none','Nothing planned'],['full','Full plan']].map(([v,l])=>`<button class="${st.weekend===v?'on':''}" data-act="weekend" data-v="${v}">${l}</button>`).join('')}</div><span class="note">Weekend meals not planned show as Flex, for leftovers.</span></div>
     <div class="field"><div class="row between"><span class="lbl">Most days in a row for one dinner</span><div class="stepper"><button data-act="set" data-k="maxRun" data-d="-1" aria-label="Fewer">−</button><span>${st.maxRun}</span><button data-act="set" data-k="maxRun" data-d="1" aria-label="More">+</button></div></div></div>
     <div class="field"><div class="row between"><span class="lbl">Plan ready before prep</span><div class="stepper"><button data-act="set" data-k="lead" data-d="-1" aria-label="Fewer days">−</button><span>${st.lead} days</span><button data-act="set" data-k="lead" data-d="1" aria-label="More days">+</button></div></div></div>
@@ -1131,6 +1142,7 @@ document.addEventListener('click', e=>{
   else if(a==='dnav'){ const n = add(ui.sel, +t.dataset.dir); if(S.plan.days[n]){ ui.sel = n; render(); } }
   else if(a==='trip'){ ui.trip = +t.dataset.i; render(); }
   else if(a==='gnav'){ ui.gc = Math.max(0, Math.min(shopWeeks().length-1, ui.gc + +t.dataset.dir)); render(); }
+  else if(a==='season'){ lsSet('mp-season', t.dataset.v==='off'?'off':null); applyTheme(); render(); }
   else if(a==='theme'){ lsSet('mp-theme', t.dataset.v==='auto'?null:t.dataset.v); applyTheme(); render(); }
   else if(a==='weekend'){ S.settings.weekend = t.dataset.v; changed('Settings'); render(); }
   else if(a==='shopday'){ const i = +t.dataset.i, cur = shopDaysOf().slice(); const nx = cur.includes(i) ? cur.filter(x=>x!==i) : cur.concat(i).sort(); if(!nx.length) return; S.settings.shopDays = nx; S.settings.shopDay = nx[0]; ui.gc = null; changed('Settings'); render(); toast(`Shopping days: ${nx.map(x=>DOW[x]).join(' and ')}. Each trip covers the meals cooked before the next one.`); }
@@ -1263,7 +1275,13 @@ setInterval(()=>{ if(!S || !TOKEN || document.visibilityState!=='visible') retur
   const waiting = Object.values(S.priceJobs||{}).some(j=>j.status!=='done' || (j.cart && j.cart.status!=='done'));
   if(waiting && !SYNC_KEYS.some(k=>JSON.stringify(S[k])!==SNAP[k])) boot(); }, 30e3);
 // Light / dark / auto (follows the phone), saved per phone.
-function applyTheme(){ const v = lsGet('mp-theme'); if(v) document.documentElement.dataset.theme = v; else delete document.documentElement.dataset.theme;
+// Seasons by month-day (inclusive). Outside these: the regular citrus colors.
+// Fall runs through Thanksgiving (4th Thursday of November); Christmas starts the next day.
+function thanksgiving(y){ const d = new Date(y,10,1); const first = (11 - d.getDay()) % 7 + 1; return y+'-11-'+pad(first+21); }
+function seasonOf(d){ const tg = thanksgiving(+d.slice(0,4)), md = d.slice(5);
+  if(md>='09-15' && d<=tg) return 'fall'; if(d>tg && md<='12-31' && md>='11-01') return 'xmas'; return ''; }
+function applyTheme(){ const se = lsGet('mp-season')==='off' ? '' : seasonOf(ds(new Date())); if(se) document.documentElement.dataset.season = se; else delete document.documentElement.dataset.season;
+  const v = lsGet('mp-theme'); if(v) document.documentElement.dataset.theme = v; else delete document.documentElement.dataset.theme;
   const dark = v==='dark' || (!v && matchMedia('(prefers-color-scheme: dark)').matches);
   const m = document.querySelector('meta[name="theme-color"]'); if(m) m.content = dark ? '#2F251C' : '#D9620F'; }
 applyTheme();
