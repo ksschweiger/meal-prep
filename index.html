@@ -268,7 +268,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-09q';
+const APP_VERSION = '2026-11-09r';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -900,8 +900,11 @@ function vGroceries(){
   // One big list: item name large, the meals it's for underneath. Items on the list first, then A–Z.
   const all = [].concat(...Object.values(rows)).filter(r=>r.packs>0 || r.fromF);
   all.forEach(r=>{ const base = r.f.replace(/-mid$/,''), u = use[base]||{}; r.meals = Object.keys(u).sort((a,b)=>u[b]-u[a]).map(id=>MEALS[id].s||MEALS[id].n); });
-  all.sort((a,b)=>(onList(b)-onList(a)) || a.F.n.localeCompare(b.F.n));
-  const sec = all.length ? `<div class="card"><div class="eyebrow">Grocery list · ${all.filter(r=>r.packs>0&&onList(r)).length} items</div>${all.map(item).join('')}</div>` : '';
+  // Grouped by type (meat, produce, dairy…), A–Z inside each group.
+  const CAT_ORDER = ['Meat','Produce','Dairy & eggs','Bakery','Frozen','Pantry'];
+  const groupsOf = {}; all.forEach(r=>{ (groupsOf[r.F.cat] = groupsOf[r.F.cat]||[]).push(r); });
+  const catKeys = Object.keys(groupsOf).sort((a,b)=>((CAT_ORDER.indexOf(a)+99)%99)-((CAT_ORDER.indexOf(b)+99)%99) || a.localeCompare(b));
+  const sec = all.length ? `<div class="card"><div class="eyebrow">Grocery list · ${all.filter(r=>r.packs>0&&onList(r)).length} items</div>${catKeys.map(k=>`<div style="font-weight:700;font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:var(--accent);margin:12px 0 2px">${esc(k)}</div>${groupsOf[k].sort((a,b)=>a.F.n.localeCompare(b.F.n)).map(item).join('')}`).join('')}</div>` : '';
   const sp = buySp.length ? `<div class="card"><div class="eyebrow">Seasonings</div>${buySp.map(x=>cbox(ci+'|sp-'+x.id, `<span class="grow1">${esc(x.n)}</span><span class="q">1<br><span class="money muted">$3.49</span></span>`)).join('')}</div>` : '';
   const rc = S.requests.filter(r=>/^Receipt/.test(r.text||'') && r.status!=='Done').length;
   const noBudget = !!(S.settings.budgetFrom && c.start.slice(0,7) < S.settings.budgetFrom);
