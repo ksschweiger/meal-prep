@@ -33,3 +33,17 @@ The app and the computer talk through two keys on the Data tab of the Meal Prep 
   The app multiplies by `packs`.
 - Reuse a price if `at` is under 7 days old; only look up missing or stale items.
 - Aldi pickup = Instacart price. The app estimates Aldi in store at 12% less.
+
+## Speed rules (decided Nov 9, 2026)
+
+- **Kroger** uses the official Kroger API (developer key), not the browser.
+- **If runs are too slow** (target: under ~15 min), turn on the cheap-item cutoff: items whose estimated
+  line cost is under the cutoff (start at $3) are priced at one store only and copied to the others;
+  only items at or above the cutoff are compared everywhere. Setting: `settings.cheapCutoff` (off when unset).
+
+## Notifications
+
+- When a price check finishes (`status` → `done`) or a cart is built (`cart.status` → `done`), the computer
+  sends a push right away through the Notification Hub's senders (ntfy for Kayla, Bark for Kaleb), to the
+  person in `by`: "Grocery prices are in" / "Your Meijer cart is ready — open the app to submit".
+- Sent directly from the computer, not through the hub's hourly queue, so it isn't delayed up to an hour.
