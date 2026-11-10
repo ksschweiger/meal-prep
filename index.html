@@ -268,7 +268,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-09r';
+const APP_VERSION = '2026-11-09s';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -1110,7 +1110,7 @@ document.addEventListener('change', e=>{
       .then(()=>{ S.requests.push({text:'Receipt uploaded', from:USER.name, at:new Date().toISOString(), status:'Waiting'}); S.flag.pending = true; render(); toast('Receipt saved. Claude reads it on the next check and updates the pantry, freezer and prices.'); })
       .catch(err=>toast('Could not upload: '+err.message)); }
   else if(a==='fzpri'){ S.freezer[+t.dataset.i].priority = t.value; changed('Freezer'); }
-  else if(a==='listpick'){ S.checks[t.dataset.key] = t.checked; changed('Groceries'); render(); }
+  else if(a==='listpick'){ S.checks[t.dataset.key] = t.checked; changed('Groceries'); const sc = window.scrollY; render(); window.scrollTo(0,sc); }
   else if(a==='check'){ S.checks[t.dataset.key] = t.checked; save(); t.closest('.listrow').classList.toggle('done', t.checked); }
   else if(a==='prof'){ S.profile = S.profile||{}; const pr = S.profile[t.dataset.p] = S.profile[t.dataset.p]||{goal:'maintain',act:'active'}; pr[t.dataset.f] = t.dataset.f==='wt' ? parseFloat(t.value)||'' : t.value;
     if(autoMacros(t.dataset.p)){ changed('Macros'); render(); toast(`Targets updated for ${NAMES[t.dataset.p]}.`); } else save(); }
