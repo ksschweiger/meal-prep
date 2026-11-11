@@ -837,7 +837,9 @@ const PICKUP = ['Kroger','Meijer','Aldi pickup'];
 // Only Kroger's cart is filled automatically (official API). Meijer and Aldi carts are built by hand in their apps.
 const AUTO_CART = ['Kroger'];
 function compareCard(items, trip){
-  const jobs = S.priceJobs||{}, job = jobs[trip.date], prices = S.prices||{};
+  const jobs = S.priceJobs||{}, job = jobs[trip.date], prices = Object.assign({}, S.prices||{});
+  // The price checker may save Aldi as "Aldi"; treat it as "Aldi pickup".
+  if(prices.Aldi) prices['Aldi pickup'] = Object.assign({}, prices.Aldi, prices['Aldi pickup']||{});
   const calc = job && job.status!=='done', cart = job && job.cart;
   // Only the checked items are priced.
   items = items.filter(r=>r.packs>0).map(r=>({f:r.f.replace(/-mid$/,''), F:r.F, packs:r.packs, cost:r.cost}));
