@@ -981,6 +981,13 @@ function vGroceries(){
   const CAT_ORDER = ['Meat','Produce','Dairy & eggs','Bakery','Frozen','Pantry'];
   const groupsOf = {}; all.forEach(r=>{ (groupsOf[r.F.cat] = groupsOf[r.F.cat]||[]).push(r); });
   const catKeys = Object.keys(groupsOf).sort((a,b)=>((CAT_ORDER.indexOf(a)+99)%99)-((CAT_ORDER.indexOf(b)+99)%99) || a.localeCompare(b));
+  // Meals this trip is buying for, above the list. Lattes are left out (every day).
+  const tripWhen = {}; trip.parts.forEach(pt=>{ const w = groceryData(pt.ci).when||{}; Object.keys(w).forEach(id=>{ const x = tripWhen[id] = tripWhen[id]||{slot:w[id].slot, days:[]}; w[id].days.forEach(d=>{ if(!x.days.includes(d)) x.days.push(d); }); }); });
+  const SLOT_LABEL = {dinner:'Dinners', lunch:'Lunches', breakfast:'Breakfasts', snack:'Snacks'};
+  const mealsCard = (()=>{ const ids = Object.keys(tripWhen).filter(id=>MEALS[id] && tripWhen[id].slot!=='coffee' && id!=='none');
+    if(!ids.length) return '';
+    const bySlot = {}; ids.forEach(id=>{ (bySlot[tripWhen[id].slot] = bySlot[tripWhen[id].slot]||[]).push(id); });
+    return `<div class="card"><div class="eyebrow">Meals this trip covers</div>${['dinner','lunch','breakfast','snack'].filter(s=>bySlot[s]).map(s=>`<div style="font-weight:700;font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:var(--accent);margin:10px 0 2px">${SLOT_LABEL[s]}</div>${bySlot[s].sort((a,b)=>tripWhen[a].days.slice().sort()[0]<tripWhen[b].days.slice().sort()[0]?-1:1).map(id=>`<div class="listrow" style="padding:6px 0"><span class="grow1">${esc(MEALS[id].n)}</span><span class="small muted">${dayRange(tripWhen[id].days)}</span></div>`).join('')}`).join('')}</div>`; })();
   const sec = all.length ? `<div class="card"><div class="eyebrow">Grocery list · ${all.filter(r=>r.packs>0&&onList(r)).length} items</div>${catKeys.map(k=>`<div style="font-weight:700;font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:var(--accent);margin:12px 0 2px">${esc(k)}</div>${groupsOf[k].sort((a,b)=>a.F.n.localeCompare(b.F.n)).map(item).join('')}`).join('')}</div>` : '';
   const sp = buySp.length ? `<div class="card"><div class="eyebrow">Seasonings</div>${buySp.map(x=>cbox(ci+'|sp-'+x.id, `<span class="grow1">${esc(x.n)}</span><span class="q">1<br><span class="money muted">$3.49</span></span>`)).join('')}</div>` : '';
   const rc = S.requests.filter(r=>/^Receipt/.test(r.text||'') && r.status!=='Done').length;
@@ -1000,7 +1007,7 @@ function vGroceries(){
     if(!nights.length) return '';
     return `<details class="card more" style="border-style:dashed;border-top-style:dashed;padding-top:14px"><summary>Drinks this week (${nights.length})</summary>${nights.map(d=>{ const id = S.plan.days[d].d, x = MEALS[id].pair;
       return `<div class="listrow"><span class="b drink" style="width:28px;height:28px">${GLASS[x.glass][1]}</span><span class="grow1"><b>${esc(x.n)}</b><br><span class="small">${nice(d)} · with ${esc(MEALS[id].n)}</span></span></div>${x.buy.map(b=>`<div class="listrow" style="padding:6px 0 6px 38px"><span class="grow1 small">${esc(b)}</span></div>`).join('')}`; }).join('')}<p class="note" style="margin:4px 0 0">Kept separate from the grocery list and food budget.</p></details>`; })()}
-  ${sec}${sp}<p class="note">Prices are rough estimates for the test. Checked items are on the grocery list and count toward the total. Meat rounds to whole 1 lb packs. When you tap Shopping done, the Pantry tab adds the shelf-stable items you bought (oil, rice, peanut butter and so on) and subtracts what this week's recipes use.</p>`;
+  ${mealsCard}${sec}${sp}<p class="note">Prices are rough estimates for the test. Checked items are on the grocery list and count toward the total. Meat rounds to whole 1 lb packs. When you tap Shopping done, the Pantry tab adds the shelf-stable items you bought (oil, rice, peanut butter and so on) and subtracts what this week's recipes use.</p>`;
 }
 
 // What a week's list buys for the pantry, used when shopping is marked done.
