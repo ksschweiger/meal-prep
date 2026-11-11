@@ -827,13 +827,15 @@ function statsCard(){
 }
 const vStats = () => statsCard();
 // ---------- Store comparison (sample prices until real store prices are connected) ----------
-const STORES = [['Meijer','Meijer',1.00],['Kroger','Kroger',1.04],['Target','Target',1.09],['Aldi pickup','Aldi',0.92],['Aldi in store','Aldi',0.80]];
+const STORES = [['Kroger','Kroger',1.04],['Meijer','Meijer',1.00],['Aldi pickup','Aldi',0.92],['Aldi in store','Aldi',0.80]];
 function hashN(str){ let h = 2166136261; for(let i=0;i<str.length;i++){ h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return ((h>>>0)%1000)/1000; }
 function samplePrice(f, base, store, mult){ return Math.round(base*mult*(0.75 + hashN(f+'|'+store)*0.5)*100)/100; }
 // Price jobs: the app writes S.priceJobs[tripDate] = {status:'waiting', items:[...], at, by};
 // the PC (Claude in Chrome) fills S.prices[store][food] = {p, at, name} and sets status 'done'.
 // Building a cart: job.cart = {store, status:'waiting'} -> the PC fills that store's cart -> 'done'.
-const PICKUP = ['Meijer','Kroger','Target','Aldi pickup'];
+const PICKUP = ['Kroger','Meijer','Aldi pickup'];
+// Only Kroger's cart is filled automatically (official API). Meijer and Aldi carts are built by hand in their apps.
+const AUTO_CART = ['Kroger'];
 function compareCard(items, trip){
   const jobs = S.priceJobs||{}, job = jobs[trip.date], prices = S.prices||{};
   const calc = job && job.status!=='done', cart = job && job.cart;
@@ -872,7 +874,7 @@ function compareCard(items, trip){
   const key = 'cmp'+trip.date, cartBusy = cart && cart.status!=='done';
   const rows = st.slice().sort((a,b)=>(a.missing-b.missing)||(a.total-b.total)).map(x=>`<details class="cmp" ${ui.cmpOpen===x.name+key?'open':''}><summary data-act="cmpopen" data-k="${esc(x.name+key)}"><span class="grow1"><b>${esc(x.name)}</b>${x===best?' <span class="pill good">Cheapest pickup</span>':''}${x.missing?` <span class="pill warn">${x.missing} not priced</span>`:''}</span><span class="money" style="margin-left:auto;font-size:17px">$${x.total.toFixed(2)}</span></summary>
     ${x.lines.map(l=>`<div class="listrow" style="padding:6px 0"><span class="grow1">${esc(l.r.F.n)}<br><span class="small muted">${esc(l.r.packs+' × '+(l.r.F.pl||''))}${x.name!=='Aldi in store'&&(prices[x.name]||{})[l.r.f]?' · '+esc((prices[x.name][l.r.f].name||'').slice(0,40)):''}</span></span><span class="money" style="${l.p!=null&&l.p===low[l.r.f]?'color:var(--good);font-weight:700':''}">${l.p==null?'—':'$'+l.p.toFixed(2)}</span></div>`).join('')}
-    ${PICKUP.includes(x.name) && !x.missing && !cartBusy ? `<button class="btn primary block" style="margin:6px 0 10px" data-act="buildcart" data-trip="${trip.date}" data-store="${esc(x.name)}">Build ${esc(x.name.replace(' pickup',''))} cart</button>` : ''}</details>`).join('');
+    ${AUTO_CART.includes(x.name) && !x.missing && !cartBusy ? `<button class="btn primary block" style="margin:6px 0 10px" data-act="buildcart" data-trip="${trip.date}" data-store="${esc(x.name)}">Build ${esc(x.name.replace(' pickup',''))} cart</button>` : PICKUP.includes(x.name) ? `<p class="note" style="margin:4px 0 10px">Add these in the ${esc(x.chain)} app. The names above are the matched items.</p>` : ''}</details>`).join('');
   const asOf = (()=>{ const ds_ = []; PICKUP.forEach(s=>items.forEach(r=>{ const x=(prices[s]||{})[r.f]; if(x&&x.at) ds_.push(x.at); })); ds_.sort(); return ds_.length ? `Prices as of ${nice(ds_[0].slice(0,10))}` : ''; })();
   const cartLine = !cart ? '' : cartBusy ? `<div class="status" style="margin-top:8px"><span style="flex:1"><b>Building your ${esc(cart.store.replace(' pickup',''))} cart…</b></span></div>`
     : `<div class="status" style="margin-top:8px"><span style="flex:1"><b>${esc(cart.store.replace(' pickup',''))} cart is ready.</b> Open the ${esc(cart.store.replace(' pickup',''))} app to review and submit.${cart.note?' '+esc(cart.note):''}</span></div>`;

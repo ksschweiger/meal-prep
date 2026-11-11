@@ -23,16 +23,29 @@ The app and the computer talk through two keys on the Data tab of the Meal Prep 
 ## `prices` (written by the computer)
 
 ```json
-{"Meijer":      {"bellpep": {"p": 1.29, "at": "2026-11-10T10:00", "name": "Meijer green bell pepper, each"}},
- "Kroger":      {},
- "Target":      {},
+{"Kroger":      {"bellpep": {"p": 1.25, "at": "2026-11-12T10:00", "name": "Kroger green bell pepper, each", "id": "0000000004065"}},
+ "Meijer":      {"bellpep": {"p": 1.29, "at": "2026-11-12T10:00", "name": "Meijer green bell pepper, each"}},
  "Aldi pickup": {}}
 ```
+
+- `id` (Kroger only) is the UPC used to fill the Kroger cart.
 
 - `p` is the price for **one** of the app's packs (Foods tab `pl`, e.g. "1 lb", "each", "15.25 oz can").
   The app multiplies by `packs`.
 - Reuse a price if `at` is under 7 days old; only look up missing or stale items.
 - Aldi pickup = Instacart price. The app estimates Aldi in store at 12% less.
+
+## Stores (decided Nov 11, 2026)
+
+- **Kroger** – Rochester Hills, 65 S Livernois (location 01800492). Official Kroger API through
+  `kroger_connect.py` on Kaleb's PC. Prices, stock and **automatic cart filling**.
+- **Meijer** – Rochester Hills - S Adams Rd (3610 Marketplace Cir). Price lookups in Chrome, signed out.
+  Cart is built by hand in the Meijer app.
+- **Aldi pickup** – ALDI - WEB 141 - Rochester Hills (2636 S Adams Rd). Price lookups on aldi.us, signed out.
+  Cart is built by hand.
+- Target dropped for now. Meijer, Aldi (and Instacart) and Target terms all bar automated/agent access;
+  Kaleb chose signed-out, low-volume lookups for Meijer and Aldi knowing that. Only Kroger permits it (API).
+- The PC side is the scheduled task "Grocery price check" (hourly, 7 AM–10 PM ET) running on Kaleb's PC.
 
 ## Speed rules (decided Nov 9, 2026)
 
