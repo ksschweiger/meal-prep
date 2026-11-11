@@ -1002,9 +1002,9 @@ function vGroceries(){
   ${compareCard(picked(), trip)}<div class="card budget"><div class="row between"><span class="eyebrow">Estimated</span><span class="eyebrow">${noBudget?'':'Monthly pace'}</span></div>
     <div class="row between"><span class="bignum money">$${total.toFixed(2)}</span>${noBudget?`<span class="small muted">Budget starts ${MON[+S.settings.budgetFrom.slice(5,7)-1]}</span></div>`:`<span class="money" style="font-size:17px;color:${pace>budget?'var(--bad)':'var(--good)'}">$${Math.round(pace)} / $${budget}</span></div>
     <div class="bar" style="--pc:${pace>budget?'var(--bad)':'var(--good)'}"><i style="width:${pct}%"></i></div>`}
-    ${trip.kind==='mid' ? `<button class="btn primary block" data-act="cart" data-ci="${ci}">Add to Meijer cart</button>` : ((S.locked||{})[c.start]
+    ${trip.kind==='mid' ? `<button class="btn primary block" data-act="cart" data-ci="${ci}">Add to cart</button>` : ((S.locked||{})[c.start]
       ? `<div class="status"><span style="flex:1"><b>Shopping complete.</b> This week is locked.</span><button class="btn" style="padding:6px 12px" data-act="unlock" data-s="${c.start}">Undo</button></div>`
-      : `<button class="btn primary block" data-act="cart" data-ci="${ci}">Add to Meijer cart</button>
+      : `<button class="btn primary block" data-act="cart" data-ci="${ci}">Add to cart</button>
          <div class="row" style="gap:8px"><button class="btn" style="flex:2;padding-inline:6px" data-act="lock" data-s="${c.start}" data-ci="${ci}">Shopping done</button><button class="btn" style="flex:1;padding-inline:4px;font-size:13px" data-act="pull" data-i="${ci}" aria-label="Move shopping a day earlier">‹ Earlier</button><button class="btn" style="flex:1;padding-inline:4px;font-size:13px" data-act="push" data-i="${ci}" aria-label="Move shopping a day later">Later ›</button></div>`)}
     <label class="btn block" for="rcpt-g" style="text-align:center;cursor:pointer">Add a receipt photo${rc?` · ${rc} waiting`:''}</label><input type="file" id="rcpt-g" accept="image/*" data-act="receipt" hidden></div>
   ${(()=>{ const nights = []; for(let d=c.start; d<=c.end; d=add(d,1)) if(isDrinkNight(d)) nights.push(d);
@@ -1171,7 +1171,7 @@ document.addEventListener('click', e=>{
     const items = (ui._picked||[]).filter(r=>r.packs>0).map(r=>({f:r.f.replace(/-mid$/,''), n:r.F.n, pl:r.F.pl, packs:r.packs, cost:r.cost}));
     S.priceJobs = S.priceJobs||{}; S.priceJobs[tr.date] = {status:'waiting', at:new Date().toISOString(), by:USER.name, items};
     changed('Price check'); render(); toast('Price check requested. Results show up here in a few minutes.'); }
-  else if(a==='buildcart'){ const j = (S.priceJobs||{})[t.dataset.trip]; if(!j) return; j.items = (ui._picked||[]).filter(r=>r.packs>0).map(r=>({f:r.f.replace(/-mid$/,''), n:r.F.n, pl:r.F.pl, packs:r.packs, cost:r.cost})); j.cart = {store:t.dataset.store, status:'waiting', at:new Date().toISOString(), by:USER.name};
+  else if(a==='buildcart'){ closeSheet(); const j = (S.priceJobs||{})[t.dataset.trip]; if(!j) return; j.items = (ui._picked||[]).filter(r=>r.packs>0).map(r=>({f:r.f.replace(/-mid$/,''), n:r.F.n, pl:r.F.pl, packs:r.packs, cost:r.cost})); j.cart = {store:t.dataset.store, status:'waiting', at:new Date().toISOString(), by:USER.name};
     (S.shopLog = S.shopLog||[]).push({trip:t.dataset.trip, at:j.cart.at, by:USER.name, store:t.dataset.store, recommended:(ui._cmp||{}).best||null, totals:(ui._cmp||{}).totals||{}, items:j.items.length, cost:((ui._cmp||{}).totals||{})[t.dataset.store]||null}); changed('Build cart'); render(); toast(`Building your ${t.dataset.store.replace(' pickup','')} cart.`); }
   else if(a==='unlocklist'){ if(S.priceJobs) delete S.priceJobs[t.dataset.trip]; changed('Price check'); render(); }
   else if(a==='statsopen'){ e.preventDefault(); ui.statsOpen = !ui.statsOpen; render(); }
@@ -1185,6 +1185,7 @@ document.addEventListener('click', e=>{
   else if(a==='openMove'){ openSheet(moveSheet(t.dataset.date)); }
   else if(a==='doMove'){ const f = t.dataset.from, to = t.dataset.to, x = S.plan.days[f].d; S.plan.days[f].d = S.plan.days[to].d; S.plan.days[to].d = x; changed('Calendar'); closeSheet(); render(); toast(`Moved to ${nice(to)}.`); }
   else if(a==='cart'){ openSheet(cartSheet(+(t.dataset.ci||ui.gc))); }
+  else if(a==='cartstore'){ ui.cartStore = t.dataset.s; openSheet(cartSheet(ui.gc)); }
   else if(a==='ptab'){ ui.ptab = t.dataset.p; render(); }
   else if(a==='fz'){ const x = S.freezer[+t.dataset.i]; x.lb = Math.max(0, x.lb + +t.dataset.d); changed('Freezer'); render(); }
   else if(a==='sp'){ const r = PANTRY.find(z=>z.row==t.dataset.row); r.left = +t.dataset.v; rebuildSpices(); changed('Pantry'); render(); }
@@ -1253,7 +1254,10 @@ function shrinkImage(file){
   });
 }
 
-// Plain-text list for Meijer: copy it, or tell Claude to fill the cart.
+// Add to cart: pick the store. Kroger can be filled automatically (official API) once prices are in;
+// other stores get a copyable list to add in their own app.
+const CART_STORES = [['Kroger','Kroger'],['Meijer','Meijer'],['Aldi pickup','Aldi']];
+const STORE_LINKS = {'Kroger':'https://www.kroger.com/cart','Meijer':'https://www.meijer.com','Aldi pickup':'https://www.aldi.us/store/aldi/storefront'};
 function cartSheet(ci){
   const html = vGroceries();
   const tmp = document.createElement('div'); tmp.innerHTML = html;
@@ -1265,10 +1269,26 @@ function cartSheet(ci){
     if(items.length) lines.push(h, ...items, '');
   });
   const txt = lines.join('\n').trim();
-  return `<div class="row between"><h2>Meijer cart</h2><button class="iconbtn" data-act="closeSheet" aria-label="Close">${I.x}</button></div>
-    <p style="margin:0">Claude can add this list to your Meijer pickup cart from your computer. Send a request that says <b>Fill my Meijer cart</b>, or copy the list below.</p>
-    <textarea id="cart-text" class="textin" rows="12" readonly>${esc(txt)}</textarea>
-    <button class="btn primary block" data-act="copylist">Copy list</button>`;
+  const def = /kroger/i.test(S.settings.store) ? 'Kroger' : /aldi/i.test(S.settings.store) ? 'Aldi pickup' : 'Meijer';
+  const store = ui.cartStore || (ui._cmp && ui._cmp.best && CART_STORES.some(x=>x[0]===ui._cmp.best) ? ui._cmp.best : def);
+  const label = (CART_STORES.find(x=>x[0]===store)||[store,store])[1];
+  const chips = `<div class="row" style="gap:6px;flex-wrap:wrap">${CART_STORES.map(([k,n])=>`<button class="chip ${k===store?'on':''}" data-act="cartstore" data-s="${esc(k)}">${esc(n)}</button>`).join('')}</div>`;
+  let top;
+  if(store==='Kroger'){
+    const T = upcomingTrips(), trip = T[ui.trip||0], job = trip && (S.priceJobs||{})[trip.date];
+    const priced = job && job.status==='done' && (ui._picked||[]).filter(r=>r.packs>0).every(r=>((S.prices||{}).Kroger||{})[r.f.replace(/-mid$/,'')]);
+    const busy = job && job.cart && job.cart.status!=='done';
+    top = busy ? `<p style="margin:0"><b>Building your Kroger cart…</b> You'll get a notification when it's ready.</p>`
+      : priced ? `<p style="margin:0">Your computer can fill your Kroger pickup cart with these items. You review and submit it in the Kroger app.</p><button class="btn primary block" data-act="buildcart" data-trip="${trip.date}" data-store="Kroger">Fill my Kroger cart</button>`
+      : `<p style="margin:0">To fill the Kroger cart automatically, tap <b>Compare cost</b> first so every item has a Kroger match. Or copy the list below.</p>`;
+  } else {
+    top = `<p style="margin:0">Add these in the ${esc(label)} app, or copy the list below.</p>`;
+  }
+  return `<div class="row between"><h2>Add to cart</h2><button class="iconbtn" data-act="closeSheet" aria-label="Close">${I.x}</button></div>
+    ${chips}${top}
+    <textarea id="cart-text" class="textin" rows="10" readonly>${esc(txt)}</textarea>
+    <button class="btn block" data-act="copylist">Copy list</button>
+    <a class="btn block" style="text-align:center" href="${STORE_LINKS[store]}" target="_blank" rel="noopener">Open ${esc(label)}</a>`;
 }
 
 // Reload from the sheet when the app comes back to the screen, so each phone sees the other's
