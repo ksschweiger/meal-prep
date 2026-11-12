@@ -113,7 +113,7 @@ main{padding-block:14px 110px}
 .wk td,.wk tbody th{border-top:1px solid var(--line);padding:4px;vertical-align:top}.wk tr.today{background:var(--sunk)}
 .wkmeal,.wkday{display:flex;flex-direction:column;align-items:flex-start;gap:1px;width:100%;text-align:left;background:none;border:0;padding:4px 2px;line-height:1.25;color:inherit;font:inherit}.wkmeal b{font-size:14px}.wkday .badges{display:flex;gap:2px;margin-top:2px}.wk td.muted{padding:8px 6px;font-size:14px}
 .serve{padding:10px 12px;margin-top:8px}.serve table{width:100%;border-collapse:collapse;margin-top:4px}.serve th{font-size:13px;text-align:left;padding:4px 4px}.serve td{border-top:1px solid var(--line);padding:6px 4px;font-size:14px;vertical-align:top}.serve td:first-child{font-weight:600;width:34%}
-.psec{margin-top:16px}.psec>.pname{display:flex;align-items:center;gap:8px;font-size:20px;border-bottom:2px solid var(--pc);padding-bottom:4px}.psec>.pname .pdot{background:var(--pc);width:12px;height:12px}
+.slot.psec{margin-top:16px;gap:6px}.psec .mealrow{padding:7px 12px}.slot.psec > .eyebrow{font-family:inherit;font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:0 2px;border:0;margin-top:6px!important}.psec>.pname{display:flex;align-items:center;gap:8px;font-size:20px;border-bottom:2px solid var(--pc);padding-bottom:4px}.psec>.pname .pdot{background:var(--pc);width:12px;height:12px}
 .dayhead h2{font-size:22px;flex:1;text-align:center}
 .banner{display:flex;gap:10px;align-items:flex-start;border-radius:10px;padding:10px 12px;font-size:14px}
 .banner svg{width:18px;height:18px;flex:none;margin-top:1px}
@@ -284,7 +284,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-11i';
+const APP_VERSION = '2026-11-11j';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -853,7 +853,7 @@ function vDay2(){
         return mealCard(d,k,p); }).join('');
       return items ? `<div class="eyebrow" style="margin-top:10px">${label}</div>${items}` : ''; }).join('');
     return `<section class="slot psec" style="--pc:${PC[p]}"><h2 class="pname"><span class="pdot"></span>${NAMES[p]}</h2>${parts}</section>`; };
-  const serve = servingCard(d,'l','Lunch') + servingCard(d,'d','Dinner');
+  const serve = S.view.mode==='both' ? servingCard(d,'l','Lunch') + servingCard(d,'d','Dinner') : '';
   return head + seg + lockb + wk + banners + mac + (serve ? `<div class="eyebrow" style="margin-top:14px">Serving</div>${serve}` : '') + ppl.map(section).join('');
 }
 
@@ -1200,7 +1200,7 @@ function autoMacros(p){
 function swap(date,key){
   const day = S.plan.days[date], slot = KEY_SLOT[key], cur = day[key];
   const w = isLocked(date) ? weekOf(date) : null, bought = w ? needsRange(w.start, w.end, true).need : null;
-  const cands = Object.keys(MEALS).filter(id=>MEALS[id].slot===slot && (!MEALS[id].for || MEALS[id].for===KEY_PERSONS[key][0]) && id!==cur && !votersWith(id,-1).length && (!bought || MEALS[id].comps.every(c=>bought[c[0]] || FOODS[c[0]].pantry))).sort((a,b)=>(S.ratings[b]||0)-(S.ratings[a]||0));
+  const cands = Object.keys(MEALS).filter(id=>MEALS[id].slot===slot && (!MEALS[id].for || MEALS[id].for===KEY_PERSONS[key][0]) && id!==cur && !votersWith(id,-1).length && (!bought || MEALS[id].comps.every(c=>bought[c[0]] || FOODS[c[0]].pantry))).sort((a,b)=>{ const net = id => Object.values(votesOf(id)).reduce((x,y)=>x+y,0); return net(b)-net(a); });
   if(!cands.length && w){ toast('This week is locked and nothing else uses what you bought. Send a request for next week instead.'); return; }
   if(!cands.length){ toast('No other options yet. Send a request and Claude will add more.'); return; }
   const i = (S.ptr[key]||0) % cands.length; S.ptr[key] = (S.ptr[key]||0)+1;
