@@ -285,7 +285,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-11q';
+const APP_VERSION = '2026-11-11r';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -767,7 +767,8 @@ function mealCard(date,key,only,opts){
       const batch = `${cookDay ? (date===cyc.start?'Cooking today':'Cook on '+nice(cyc.start)) : 'Cooked '+nice(cyc.start)} · whole batch${key==='d'?' for the family':persons.length>1?' for both of you':''}${live.length>1?`, ${live.length} days`:''}`;
       const dk = date+'|'+key, op = n => (ui.secOpen||{})[dk+'|'+n] ? 'open' : '';
       const sec = (n,title,body) => `<details class="more" ${op(n)}><summary data-act="secopen" data-k="${esc(dk+'|'+n)}">${title}</summary>${body}</details>`;
-      return sec('serve','Serving size', opts.serving || `<div class="grp" style="margin-top:8px">${rows}</div>${cookedNote}`)
+      // Both of us: serving table is the first dropdown. Just me / old layout: portions show right on the card.
+      return (opts.bare ? sec('serve','Serving size', opts.serving) : `<div class="grp">${rows}</div>${cookedNote}`)
         + sec('ing','Ingredients', `<div class="eyebrow" style="margin-top:10px">${batch}</div><div class="tblwrap"><table class="ing" style="margin-top:4px">${ing}</table></div>`)
         + sec('steps','Instructions', `<ol class="steps">${m.steps.map(s=>`<li>${stepTxt(s)}</li>`).join('')}</ol>${m.src?`<p class="note" style="margin:10px 0 0">Based on <a href="${esc(m.src)}" target="_blank" rel="noopener">${esc(srcName(m.src))}</a>, with amounts rescaled for your macros.</p>`:''}${fam?`<div style="margin-top:10px"><button class="btn" data-act="openMove" data-date="${date}">Move this dinner</button></div>`:''}`)
         + (help ? sec('cw','Cooked weight', `<div style="margin-top:10px">${tareTip}</div><div class="cookhelp">${help}</div>`) : ''); })();
