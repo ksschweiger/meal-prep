@@ -286,7 +286,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-11s';
+const APP_VERSION = '2026-11-11t';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -1025,10 +1025,20 @@ function upcomingTrips(){
   merged.forEach(m=>{ m.ci = m.parts[0].ci; m.kind = m.parts.every(x=>x.kind==='mid') ? 'mid' : 'main'; });
   return merged;
 }
+// The Shopping tab always shows three trips: last, current (the next one on or after today) and next.
+function groceryTrips(){
+  const W = shopWeeks(), all = W.map((w,ci)=>({date:w.start, ci, kind:'main', parts:[{ci, kind:'main', date:w.start}]}));
+  // Fold in a midweek fresh trip if that's turned on.
+  if(S.settings.freshTrip) W.forEach((w,ci)=>{ const g = groceryData(ci); if(g.rows.Midweek) all.push({date:g.mid, ci, kind:'mid', parts:[{ci, kind:'mid', date:g.mid}]}); });
+  all.sort((a,b)=>a.date<b.date?-1:1);
+  let cur = all.findIndex(x=>x.date>=TODAY); if(cur<0) cur = all.length-1;
+  const out = []; [[cur-1,'Last'],[cur,'Current'],[cur+1,'Next']].forEach(([i,l])=>{ if(all[i]) out.push(Object.assign({label:l}, all[i])); });
+  return out;
+}
 function vGroceries(){
-  const T = upcomingTrips();
-  if(!T.length) return `<h2 style="font-size:22px">Groceries</h2><div class="card muted">Nothing to shop for in the next week.</div>`;
-  if(ui.trip==null || ui.trip>=T.length) ui.trip = 0;
+  const T = groceryTrips();
+  if(!T.length) return `<h2 style="font-size:22px">Groceries</h2><div class="card muted">Nothing planned yet.</div>`;
+  if(ui.trip==null || ui.trip>=T.length) ui.trip = Math.max(0, T.findIndex(x=>x.label==='Current'));
   const trip = T[ui.trip], mainPart = trip.parts.find(x=>x.kind==='main') || trip.parts[0], ci = ui.gc = mainPart.ci;
   let {c, need, late, mid, cats, haveIt, use, when} = groceryData(ci);
   // Gather this trip's items from each part (a main trip and/or a midweek fresh trip folded into it).
@@ -1053,7 +1063,7 @@ function vGroceries(){
   const picked = () => [].concat(...Object.values(rows)).filter(r=>r.packs>0 && onList(r));
   total = picked().reduce((a,r)=>a+r.cost,0) + buySp.length*3.49;
   ui._picked = picked();
-  const tripBar = `<div class="row" style="justify-content:center;gap:6px;flex-wrap:wrap">${T.map((x,i)=>`<button class="chip ${i===ui.trip?'on':''}" data-act="trip" data-i="${i}">${nice(x.date)}</button>`).join('')}</div>`;
+  const tripBar = `<div class="seg">${T.map((x,i)=>`<button class="${i===ui.trip?'on':''}" style="line-height:1.2;padding-block:6px" data-act="trip" data-i="${i}">${x.label}<br><span class="small" style="font-weight:600;opacity:.75">${DOW[dow(x.date)]} ${pd(x.date).getMonth()+1}/${pd(x.date).getDate()}</span></button>`).join('')}</div>`;
   const tspTxt = (id,g) => { const t = g/(G_PER_TSP[id]||2.5); return t>=3 ? frac(Math.max(.25,Math.round(t/3*4)/4))+' tbsp' : frac(Math.max(.25,Math.round(t*4)/4))+' tsp'; };
   const ozTxt = g => (Math.round(g/28.35*10)/10)+' oz';
   const cbox = (key, body, extraCls, on) => { on = on===undefined ? !!S.checks[key] : on; return `<label class="listrow ${on?'':'off'} ${extraCls||''}"><input type="checkbox" class="check" id="chk-${key.replace(/[^a-z0-9]/gi,'_')}" data-act="listpick" data-key="${key}" ${on?'checked':''} ${locked?'disabled':''}>${body}</label>`; };
@@ -1272,7 +1282,7 @@ document.addEventListener('click', e=>{
   const a = t.dataset.act;
   if(a==='closeSheet'){ if(e.target===t || t.tagName==='BUTTON') closeSheet(); return; }
   if(['cooked','mac','macg','budget','store','check','drinkon','prof','spoz','receipt','fzpri'].includes(a)) return;
-  if(a==='tab'){ ui.tab = t.dataset.tab==='calendar' && ui.calLast && !CAL_TABS.includes(ui.tab) ? ui.calLast : t.dataset.tab; render(); window.scrollTo(0,0); }
+  if(a==='tab'){ if(t.dataset.tab==='groceries' && ui.tab!=='groceries') ui.trip = null; ui.tab = t.dataset.tab==='calendar' && ui.calLast && !CAL_TABS.includes(ui.tab) ? ui.calLast : t.dataset.tab; render(); window.scrollTo(0,0); }
   else if(a==='calview'){ const v = t.dataset.v;
     if(v==='month'){ ui.tab = 'calendar'; const x = pd(ui.sel||TODAY); ui.ym = [x.getFullYear(), x.getMonth()]; }
     else if(v==='week'){ ui.wk = monOf(ui.tab==='calendar' ? TODAY : ui.sel); ui.tab = 'week'; }
@@ -1298,7 +1308,7 @@ document.addEventListener('click', e=>{
   else if(a==='theme'){ lsSet('mp-theme', t.dataset.v==='auto'?null:t.dataset.v); applyTheme(); render(); }
   else if(a==='weekend'){ S.settings.weekend = t.dataset.v; changed('Settings'); render(); }
   else if(a==='shopday'){ const i = +t.dataset.i, cur = shopDaysOf().slice(); const nx = cur.includes(i) ? cur.filter(x=>x!==i) : cur.concat(i).sort(); if(!nx.length) return; S.settings.shopDays = nx; S.settings.shopDay = nx[0]; ui.gc = null; changed('Settings'); render(); toast(`Shopping days: ${nx.map(x=>DOW[x]).join(' and ')}. Each trip covers the meals cooked before the next one.`); }
-  else if(a==='goList'){ ui.trip = +t.dataset.ti; ui.tab = 'groceries'; render(); window.scrollTo(0,0); }
+  else if(a==='goList'){ const dd = (upcomingTrips()[+t.dataset.ti]||{}).date, i = groceryTrips().findIndex(x=>x.date===dd); ui.trip = i<0 ? null : i; ui.tab = 'groceries'; render(); window.scrollTo(0,0); }
   else if(a==='rate'){ const id = t.dataset.id, v = +t.dataset.v, o = Object.assign({}, votesOf(id)), me = S.view.me;
     o[me] = o[me]===v ? 0 : v; if(!o[me]) delete o[me]; if(Object.keys(o).length) S.ratings[id] = o; else delete S.ratings[id]; changed('Ratings'); render();
     if(o[me]===1) toast(`Liked. ${MEALS[id].n} will come back more often.`); else if(o[me]===-1) toast('Noted. Claude will plan this less. Tap swap to replace it now.'); }
@@ -1417,7 +1427,7 @@ function cartSheet(ci){
   const chips = `<div class="row" style="gap:6px;flex-wrap:wrap">${CART_STORES.map(([k,n])=>`<button class="chip ${k===store?'on':''}" data-act="cartstore" data-s="${esc(k)}">${esc(n)}</button>`).join('')}</div>`;
   let top;
   if(store==='Kroger'){
-    const T = upcomingTrips(), trip = T[ui.trip||0], job = trip && (S.priceJobs||{})[trip.date];
+    const T = groceryTrips(), trip = T[ui.trip||0], job = trip && (S.priceJobs||{})[trip.date];
     const priced = job && job.status==='done' && (ui._picked||[]).filter(r=>r.packs>0).every(r=>((S.prices||{}).Kroger||{})[r.f.replace(/-mid$/,'')]);
     const busy = job && job.cart && job.cart.status!=='done';
     top = busy ? `<p style="margin:0"><b>Building your Kroger cart…</b> You'll get a notification when it's ready.</p>`
