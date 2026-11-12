@@ -160,6 +160,7 @@ details.more[open] summary::after{content:" −";}
 .ing td{padding:4px 0;border-bottom:1px solid var(--line)}
 .ing td.n{font-family:var(--mono);text-align:right;white-space:nowrap;padding-left:8px;font-size:12px}
 .tblwrap{overflow-x:auto}
+#view{overflow-x:clip}
 ol.steps .q{color:var(--accent);font-weight:700;white-space:nowrap}
 ol.steps{margin:10px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:14px}
 .tare{font-size:13.5px;background:color-mix(in srgb,var(--accent) 12%,transparent);border-left:3px solid var(--accent);border-radius:6px;padding:8px 10px}
@@ -284,7 +285,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-11n';
+const APP_VERSION = '2026-11-11o';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -1229,23 +1230,32 @@ function swap(date,key){
 }
 
 // Slide the new week/day in from the side it came from (dir 1 = next, -1 = previous).
-function slideIn(dir){ const el = document.querySelector('#view .view'); if(!el || !el.animate || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  el.animate([{transform:`translateX(${dir*70}px)`, opacity:0.15},{transform:'none', opacity:1}], {duration:230, easing:'cubic-bezier(.2,.8,.2,1)'}); }
-// Swipe left/right on the Week and day pages to go to the next/previous week or day.
-(()=>{ let sx = null, sy = 0, st = 0;
+const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+function slideIn(dir, from){ const el = document.querySelector('#view .view'); if(!el || !el.animate || reduceMotion()) return;
+  const w = window.innerWidth; el.animate([{transform:`translateX(${dir*(from||w)}px)`},{transform:'none'}], {duration:260, easing:'cubic-bezier(.2,.8,.2,1)'}); }
+// Pull the page: on the Week and day pages the page follows your finger sideways; let go past a quarter of the screen
+// (or flick) and it slides off while the next week/day slides in behind it. Otherwise it springs back.
+(()=>{ let sx = null, sy = 0, st = 0, lx = 0, ly = 0, axis = null, el = null;
+  const target = dir => { if(ui.tab==='week') return {go:()=>{ ui.wk = add(ui.wk || monOf(TODAY), dir*7); }};
+    const n = add(ui.sel, dir); return (S.plan.days[n] || markers(n).thaw || markers(n).shop) ? {go:()=>{ ui.sel = n; }} : null; };
   document.addEventListener('touchstart', e=>{ const t = e.touches[0];
     if(e.touches.length!==1 || !['week','day','day2'].includes(ui.tab) || e.target.closest('.tblwrap,input,textarea,select,.sheet')) { sx = null; return; }
-    sx = lx = t.clientX; sy = ly = t.clientY; st = Date.now(); }, {passive:true});
-  let lx = 0, ly = 0;
-  document.addEventListener('touchmove', e=>{ if(sx==null) return; lx = e.touches[0].clientX; ly = e.touches[0].clientY; }, {passive:true});
-  const end = (x,y)=>{ if(sx==null) return; const dx = x - sx, dy = y - sy; sx = null;
-    if(Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx)*0.6 || Date.now()-st > 800) return;
-    const dir = dx < 0 ? 1 : -1;
-    if(ui.tab==='week'){ ui.wk = add(ui.wk || monOf(TODAY), dir*7); render(); window.scrollTo(0,0); slideIn(dir); }
-    else { const n = add(ui.sel, dir); if(S.plan.days[n] || markers(n).thaw || markers(n).shop){ ui.sel = n; render(); window.scrollTo(0,0); slideIn(dir); } } };
-  document.addEventListener('touchend', e=>{ const t = e.changedTouches[0]; end(t.clientX, t.clientY); }, {passive:true});
-  // Some phones cancel the touch once they start scrolling; use the last position seen.
-  document.addEventListener('touchcancel', ()=>end(lx, ly), {passive:true});
+    sx = lx = t.clientX; sy = ly = t.clientY; st = Date.now(); axis = null; el = document.querySelector('#view .view'); }, {passive:true});
+  document.addEventListener('touchmove', e=>{ if(sx==null) return; lx = e.touches[0].clientX; ly = e.touches[0].clientY;
+    const dx = lx - sx, dy = ly - sy;
+    if(!axis && (Math.abs(dx)>8 || Math.abs(dy)>8)) axis = Math.abs(dx) > Math.abs(dy)*1.2 ? 'x' : 'y';
+    if(axis==='x' && el && !reduceMotion()){ const can = target(dx<0?1:-1), pull = can ? dx : dx*0.25;
+      el.style.transition = 'none'; el.style.transform = `translateX(${pull}px)`; el.style.boxShadow = '0 0 24px rgba(0,0,0,.12)'; } }, {passive:true});
+  const end = ()=>{ if(sx==null) return; const dx = lx - sx, dt = Date.now()-st; sx = null; if(axis!=='x' || !el) return;
+    const w = window.innerWidth, dir = dx < 0 ? 1 : -1, t = target(dir), fling = Math.abs(dx) > 40 && Math.abs(dx)/dt > 0.5;
+    const reset = () => { el.style.transition = ''; el.style.transform = ''; el.style.boxShadow = ''; };
+    if(t && (Math.abs(dx) > w*0.25 || fling)){
+      if(reduceMotion()){ t.go(); render(); window.scrollTo(0,0); return; }
+      el.style.transition = 'transform .16s ease-in'; el.style.transform = `translateX(${-dir*w}px)`;
+      setTimeout(()=>{ t.go(); render(); window.scrollTo(0,0); slideIn(dir); }, 150);
+    } else { el.style.transition = 'transform .22s cubic-bezier(.2,.8,.2,1)'; el.style.transform = 'translateX(0)'; setTimeout(reset, 230); } };
+  document.addEventListener('touchend', end, {passive:true});
+  document.addEventListener('touchcancel', end, {passive:true});
 })();
 document.addEventListener('click', e=>{
   const t = e.target.closest('[data-act]'); if(!t) return;
