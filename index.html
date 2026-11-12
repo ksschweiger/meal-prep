@@ -286,7 +286,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-11t';
+const APP_VERSION = '2026-11-11u';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -1031,7 +1031,9 @@ function groceryTrips(){
   // Fold in a midweek fresh trip if that's turned on.
   if(S.settings.freshTrip) W.forEach((w,ci)=>{ const g = groceryData(ci); if(g.rows.Midweek) all.push({date:g.mid, ci, kind:'mid', parts:[{ci, kind:'mid', date:g.mid}]}); });
   all.sort((a,b)=>a.date<b.date?-1:1);
-  let cur = all.findIndex(x=>x.date>=TODAY); if(cur<0) cur = all.length-1;
+  // A trip stays Current through the end of the first cook day it shops for (shop Sunday, cook Monday → current until Monday night).
+  const firstCook = x => { for(let d=x.date, n=0; n<10; d=add(d,1), n++) if(S.plan.cycles.some(c=>c.start===d)) return d; return x.date; };
+  let cur = all.findIndex(x=>firstCook(x)>=TODAY); if(cur<0) cur = all.length-1;
   const out = []; [[cur-1,'Last'],[cur,'Current'],[cur+1,'Next']].forEach(([i,l])=>{ if(all[i]) out.push(Object.assign({label:l}, all[i])); });
   return out;
 }
