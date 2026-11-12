@@ -283,7 +283,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-11c';
+const APP_VERSION = '2026-11-11d';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -679,6 +679,7 @@ function render(){
   applyTallow();
   document.getElementById('tabs').innerHTML = TABS.map(t=>`<button data-act="tab" data-tab="${t[0]}" class="${ui.tab===t[0]?'on':''}" aria-label="${t[1]}">${t[2]}<span>${t[1]}</span></button>`).join('');
   const v = document.getElementById('view');
+  v.style.touchAction = ['week','day','day2'].includes(ui.tab) ? 'pan-y' : '';
   v.innerHTML = '<div class="view">'+({calendar:vCalendar,week:vWeek,day2:vDay2,day:vDay,stats:vStats,groceries:vGroceries,pantry:vPantry,macros:vMacros,settings:vSettings}[ui.tab])()+'</div>';
   updateDot();
 }
@@ -785,7 +786,7 @@ function dayBanners(d){
 }
 function vDay(){
   const d = ui.sel, day = S.plan.days[d];
-  const head = `<div class="dayhead"><button class="iconbtn" data-act="dnav" data-dir="-1" aria-label="Previous day">${I.left}</button><h2>${nice(d)}</h2><button class="iconbtn" data-act="dnav" data-dir="1" aria-label="Next day">${I.right}</button></div><div style="text-align:center"><button class="linkbtn" data-act="tab" data-tab="day2">Try the new day layout ›</button></div>`;
+  const head = `<div class="dayhead"><button class="iconbtn" data-act="dnav" data-dir="-1" aria-label="Previous day">${I.left}</button><h2>${nice(d)}</h2><button class="iconbtn" data-act="dnav" data-dir="1" aria-label="Next day">${I.right}</button></div><div class="seg" style="margin-top:6px"><button class="${ui.tab==='day'?'on':''}" data-act="daylayout" data-v="day">Classic day</button><button class="${ui.tab==='day2'?'on':''}" data-act="daylayout" data-v="day2">By person</button></div>`;
   let banners = dayBanners(d);
   if(!day) return head + banners + '<div class="card muted">No meals planned for this day.</div>';
   const flexCard = k => `<article class="meal" style="border-style:dashed"><div class="mtop"><div class="mtitle">${k==='d'||k==='l'?`<div class="who" style="--pc:var(--accent)">${k==='d'?'Family dinner':'Shared lunch'}</div>`:`<div class="who" style="--pc:${PC[KEY_PERSONS[k][0]]}"><span class="pdot"></span>${NAMES[KEY_PERSONS[k][0]]}</div>`}<h3>${k==='ys'?'Nothing planned':!eaters(d,k).length?'Away':S.plan.days[d].off?'Open':'Flex'}</h3><div class="note">${k==='ys'?'Snacks are off for now.':!eaters(d,k).length?`${NAMES[KEY_PERSONS[k][0]]} is away today. Nothing planned.`:S.plan.days[d].off?'Plan pushed back a day. Use leftovers or eat out.':'Eat leftovers from the week first, then whatever fits the day.'}</div></div></div></article>`;
@@ -821,7 +822,7 @@ function vWeek(){
 const SECTIONS = {K:[['Breakfast',['c','kb']],['Lunch',['l']],['Dinner',['d']],['Snack',['ks']]], Y:[['Breakfast',['c','yb']],['Lunch',['l']],['Dinner',['d']],['Snack',['ys']]]};
 function vDay2(){
   const d = ui.sel, day = S.plan.days[d];
-  const head = `<div class="dayhead"><button class="iconbtn" data-act="dnav" data-dir="-1" aria-label="Previous day">${I.left}</button><h2>${nice(d)}</h2><button class="iconbtn" data-act="dnav" data-dir="1" aria-label="Next day">${I.right}</button></div><div style="text-align:center"><button class="linkbtn" data-act="tab" data-tab="day">Old day layout ›</button></div>`;
+  const head = `<div class="dayhead"><button class="iconbtn" data-act="dnav" data-dir="-1" aria-label="Previous day">${I.left}</button><h2>${nice(d)}</h2><button class="iconbtn" data-act="dnav" data-dir="1" aria-label="Next day">${I.right}</button></div><div class="seg" style="margin-top:6px"><button class="${ui.tab==='day'?'on':''}" data-act="daylayout" data-v="day">Classic day</button><button class="${ui.tab==='day2'?'on':''}" data-act="daylayout" data-v="day2">By person</button></div>`;
   const banners = dayBanners(d);
   if(!day) return head + banners + '<div class="card muted">No meals planned for this day.</div>';
   const seg = `<div class="seg"><button class="${S.view.mode==='mine'?'on':''}" data-act="vmode" data-v="mine">Just ${NAMES[S.view.me]}</button><button class="${S.view.mode==='both'?'on':''}" data-act="vmode" data-v="both">Both of us</button></div>`;
@@ -1199,12 +1200,17 @@ function swap(date,key){
 (()=>{ let sx = null, sy = 0, st = 0;
   document.addEventListener('touchstart', e=>{ const t = e.touches[0];
     if(e.touches.length!==1 || !['week','day','day2'].includes(ui.tab) || e.target.closest('.tblwrap,input,textarea,select,.sheet')) { sx = null; return; }
-    sx = t.clientX; sy = t.clientY; st = Date.now(); }, {passive:true});
-  document.addEventListener('touchend', e=>{ if(sx==null) return; const t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy; sx = null;
+    sx = lx = t.clientX; sy = ly = t.clientY; st = Date.now(); }, {passive:true});
+  let lx = 0, ly = 0;
+  document.addEventListener('touchmove', e=>{ if(sx==null) return; lx = e.touches[0].clientX; ly = e.touches[0].clientY; }, {passive:true});
+  const end = (x,y)=>{ if(sx==null) return; const dx = x - sx, dy = y - sy; sx = null;
     if(Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx)*0.6 || Date.now()-st > 800) return;
     const dir = dx < 0 ? 1 : -1;
     if(ui.tab==='week'){ ui.wk = add(ui.wk || monOf(TODAY), dir*7); render(); window.scrollTo(0,0); }
-    else { const n = add(ui.sel, dir); if(S.plan.days[n] || markers(n).thaw || markers(n).shop){ ui.sel = n; render(); window.scrollTo(0,0); } } }, {passive:true});
+    else { const n = add(ui.sel, dir); if(S.plan.days[n] || markers(n).thaw || markers(n).shop){ ui.sel = n; render(); window.scrollTo(0,0); } } };
+  document.addEventListener('touchend', e=>{ const t = e.changedTouches[0]; end(t.clientX, t.clientY); }, {passive:true});
+  // Some phones cancel the touch once they start scrolling; use the last position seen.
+  document.addEventListener('touchcancel', ()=>end(lx, ly), {passive:true});
 })();
 document.addEventListener('click', e=>{
   const t = e.target.closest('[data-act]'); if(!t) return;
@@ -1213,11 +1219,12 @@ document.addEventListener('click', e=>{
   if(['cooked','mac','macg','budget','store','check','drinkon','prof','spoz','receipt','fzpri'].includes(a)) return;
   if(a==='tab'){ ui.tab = t.dataset.tab; render(); window.scrollTo(0,0); }
   else if(a==='mon'){ let [y,m] = ui.ym; m += +t.dataset.dir; if(m<0){m=11;y--} if(m>11){m=0;y++} ui.ym = [y,m]; render(); }
-  else if(a==='pick'){ const pm = markers(t.dataset.date); if(!S.plan.days[t.dataset.date] && !pm.thaw && !pm.shop) return; ui.sel = t.dataset.date; ui.tab = 'day'; render(); window.scrollTo(0,0); }
+  else if(a==='pick'){ const pm = markers(t.dataset.date); if(!S.plan.days[t.dataset.date] && !pm.thaw && !pm.shop) return; ui.sel = t.dataset.date; ui.tab = lsGet('mp-daylayout')||'day2'; render(); window.scrollTo(0,0); }
+  else if(a==='daylayout'){ ui.tab = t.dataset.v; lsSet('mp-daylayout', ui.tab); render(); }
   else if(a==='wnav'){ ui.wk = add(ui.wk, +t.dataset.dir); render(); }
-  else if(a==='wkday'){ ui.sel = t.dataset.date; ui.tab = 'day2'; render(); window.scrollTo(0,0); }
-  else if(a==='wkmeal'){ const d = t.dataset.date, k = t.dataset.k; ui.sel = d; ui.tab = 'day2'; ['K','Y'].forEach(p=>{ ui.mealOpen[d+'|'+k+'|'+p] = true; }); render();
-    const p = ['K','Y'].filter(shows).find(x=>eaters(d,k).includes(x)), el = p && document.getElementById('m-'+(d+'|'+k+'|'+p).replace(/[^a-z0-9]/gi,'_'));
+  else if(a==='wkday'){ ui.sel = t.dataset.date; ui.tab = lsGet('mp-daylayout')||'day2'; render(); window.scrollTo(0,0); }
+  else if(a==='wkmeal'){ const d = t.dataset.date, k = t.dataset.k; ui.sel = d; ui.tab = lsGet('mp-daylayout')||'day2'; ui.mealOpen[d+'|'+k] = true; ['K','Y'].forEach(p=>{ ui.mealOpen[d+'|'+k+'|'+p] = true; }); render();
+    const p = ['K','Y'].filter(shows).find(x=>eaters(d,k).includes(x)), el = document.getElementById('m-'+(ui.tab==='day' ? d+'|'+k : d+'|'+k+'|'+p).replace(/[^a-z0-9]/gi,'_'));
     if(el){ const hd = document.querySelector('header.top'); window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - (hd?hd.offsetHeight:0) - 50); } else window.scrollTo(0,0); }
   else if(a==='macshow'){ ui.macShow = !ui.macShow; const sc = window.scrollY; render(); window.scrollTo(0,sc); }
   else if(a==='dnav'){ const n = add(ui.sel, +t.dataset.dir); if(S.plan.days[n]){ ui.sel = n; render(); } }
