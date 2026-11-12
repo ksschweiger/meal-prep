@@ -113,7 +113,7 @@ main{padding-block:14px 110px}
 .wk td,.wk tbody th{border-top:1px solid var(--line);padding:4px;vertical-align:top}.wk tr.today{background:var(--sunk)}
 .wkmeal,.wkday{display:flex;flex-direction:column;align-items:flex-start;gap:1px;width:100%;text-align:left;background:none;border:0;padding:4px 2px;line-height:1.25;color:inherit;font:inherit}.wkmeal b{font-size:14px}.wkday .badges{display:flex;gap:2px;margin-top:2px}.wk td.muted{padding:8px 6px;font-size:14px}
 .serve{padding:10px 12px;margin-top:8px}.serve table{width:100%;border-collapse:collapse;margin-top:4px}.serve th{font-size:13px;text-align:left;padding:4px 4px}.serve td{border-top:1px solid var(--line);padding:6px 4px;font-size:14px;vertical-align:top}.serve td:first-child{font-weight:600;width:34%}
-.slot.psec{margin-top:16px;gap:6px}.psec .mealrow{padding:7px 12px}.slot.psec > .eyebrow{font-family:inherit;font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:0 2px;border:0;margin-top:6px!important}.psec>.pname{display:flex;align-items:center;gap:8px;font-size:20px;border-bottom:2px solid var(--pc);padding-bottom:4px}.psec>.pname .pdot{background:var(--pc);width:12px;height:12px}
+.slot.psec{margin-top:16px;gap:6px}.psec .slothead{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--line);padding:10px 4px;color:inherit;font:inherit;line-height:1.3}.psec .slothead .grow1{flex:1}.psec .slothead b{font-family:var(--display);font-size:17px}.psec .slotbody{display:flex;flex-direction:column;gap:8px;padding-bottom:6px}.slot.psec > .eyebrow{font-family:inherit;font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:0 2px;border:0;margin-top:6px!important}.psec>.pname{display:flex;align-items:center;gap:8px;font-size:20px;border-bottom:2px solid var(--pc);padding-bottom:4px}.psec>.pname .pdot{background:var(--pc);width:12px;height:12px}
 .dayhead h2{font-size:22px;flex:1;text-align:center}
 .banner{display:flex;gap:10px;align-items:flex-start;border-radius:10px;padding:10px 12px;font-size:14px}
 .banner svg{width:18px;height:18px;flex:none;margin-top:1px}
@@ -284,7 +284,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-11j';
+const APP_VERSION = '2026-11-11k';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -851,7 +851,11 @@ function vDay2(){
         if(!eaters(d,k).includes(p)) return isFlex(d,k) ? empty('Flex','Eat leftovers from the week first, then whatever fits the day.') : empty('Out','Not eating this one at home.');
         if(isFlex(d,k)) return empty('Flex','Eat leftovers from the week first, then whatever fits the day.');
         return mealCard(d,k,p); }).join('');
-      return items ? `<div class="eyebrow" style="margin-top:10px">${label}</div>${items}` : ''; }).join('');
+      if(!items) return '';
+      // Collapsed by default: the header shows what's in it; tap to open.
+      const sk = d+'|'+p+'|'+label, open = !!(ui.slotOpen||{})[sk];
+      const names = keys.filter(k=>KEY_PERSONS[k].includes(p) && (['l','d','kb','yb'].includes(k) || (day[k] && day[k]!=='none' && !isFlex(d,k)))).map(k=>!eaters(d,k).includes(p) ? (isFlex(d,k)?'Flex':'Out') : isFlex(d,k) ? 'Flex' : (MEALS[day[k]].s||MEALS[day[k]].n)).join(' · ');
+      return `<button class="slothead" data-act="slotopen" data-k="${esc(sk)}" aria-expanded="${open}"><span class="grow1"><b>${label}</b><br><span class="small muted">${esc(names)}</span></span><span class="chev" style="${open?'transform:rotate(90deg)':''}">›</span></button>${open?`<div class="slotbody">${items}</div>`:''}`; }).join('');
     return `<section class="slot psec" style="--pc:${PC[p]}"><h2 class="pname"><span class="pdot"></span>${NAMES[p]}</h2>${parts}</section>`; };
   const serve = S.view.mode==='both' ? servingCard(d,'l','Lunch') + servingCard(d,'d','Dinner') : '';
   return head + seg + lockb + wk + banners + mac + (serve ? `<div class="eyebrow" style="margin-top:14px">Serving</div>${serve}` : '') + ppl.map(section).join('');
@@ -1240,9 +1244,10 @@ document.addEventListener('click', e=>{
   else if(a==='daylayout'){ ui.tab = t.dataset.v; lsSet('mp-daylayout', ui.tab); render(); }
   else if(a==='wnav'){ ui.wk = add(ui.wk, +t.dataset.dir); render(); slideIn(Math.sign(+t.dataset.dir)); }
   else if(a==='wkday'){ ui.sel = t.dataset.date; ui.tab = lsGet('mp-daylayout')||'day2'; render(); window.scrollTo(0,0); }
-  else if(a==='wkmeal'){ const d = t.dataset.date, k = t.dataset.k; ui.sel = d; ui.tab = lsGet('mp-daylayout')||'day2'; ui.mealOpen[d+'|'+k] = true; ['K','Y'].forEach(p=>{ ui.mealOpen[d+'|'+k+'|'+p] = true; }); render();
+  else if(a==='wkmeal'){ const d = t.dataset.date, k = t.dataset.k; ui.sel = d; ui.tab = lsGet('mp-daylayout')||'day2'; ui.mealOpen[d+'|'+k] = true; ui.slotOpen = ui.slotOpen||{}; ['K','Y'].forEach(p=>{ ui.mealOpen[d+'|'+k+'|'+p] = true; ui.slotOpen[d+'|'+p+'|'+(k==='l'?'Lunch':'Dinner')] = true; }); render();
     const p = ['K','Y'].filter(shows).find(x=>eaters(d,k).includes(x)), el = document.getElementById('m-'+(ui.tab==='day' ? d+'|'+k : d+'|'+k+'|'+p).replace(/[^a-z0-9]/gi,'_'));
     if(el){ const hd = document.querySelector('header.top'); window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - (hd?hd.offsetHeight:0) - 50); } else window.scrollTo(0,0); }
+  else if(a==='slotopen'){ ui.slotOpen = ui.slotOpen||{}; ui.slotOpen[t.dataset.k] = !ui.slotOpen[t.dataset.k]; const sc = window.scrollY; render(); window.scrollTo(0,sc); }
   else if(a==='macshow'){ ui.macShow = !ui.macShow; const sc = window.scrollY; render(); window.scrollTo(0,sc); }
   else if(a==='dnav'){ const n = add(ui.sel, +t.dataset.dir); if(S.plan.days[n]){ ui.sel = n; render(); slideIn(+t.dataset.dir); } }
   else if(a==='trip'){ ui.trip = +t.dataset.i; render(); }
