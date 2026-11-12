@@ -185,7 +185,7 @@ ol.steps{margin:10px 0 0;padding-left:20px;display:flex;flex-direction:column;ga
 .listrow.off .grow1, .listrow.off .q{opacity:.5}
 .pill.good{background:color-mix(in srgb,var(--good) 15%,var(--surface));color:var(--good)}
 details.cmp{border-top:1px solid var(--line)}
-details.cmp summary{display:flex;width:100%;align-items:center;gap:8px;padding:10px 0;cursor:pointer;list-style:none}
+details.cmp summary{display:flex;flex-wrap:wrap;width:100%;align-items:center;gap:8px;padding:10px 0;cursor:pointer;list-style:none}
 details.cmp summary::-webkit-details-marker{display:none}
 details.cmp summary::after{content:"›";color:var(--muted);font-size:20px;transition:transform .15s}
 details.cmp[open] summary::after{transform:rotate(90deg)}
@@ -286,7 +286,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-11u';
+const APP_VERSION = '2026-11-12a';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -950,12 +950,20 @@ function compareCard(items, trip){
   const lineP = (store, r) => {
     if(store==='Aldi in store'){ const a = (prices['Aldi pickup']||{})[r.f]; return a ? Math.round(a.p*r.packs*0.88*100)/100 : null; }
     const x = (prices[store]||{})[r.f]; return x ? Math.round(x.p*r.packs*100)/100 : null; };
-  const st = STORES.map(([name,chain])=>{ const lines = items.map(r=>({r, p:lineP(name, r)})); const priced = lines.filter(l=>l.p!=null);
-    return {name, chain, lines, total:priced.reduce((a,x)=>a+x.p,0), missing:lines.length-priced.length}; });
-  const low = {}; items.forEach((r,i)=>{ const v = st.map(x=>x.lines[i].p).filter(p=>p!=null); low[r.f] = v.length ? Math.min(...v) : null; });
+  // A store that doesn't carry an item still gets it in its total, at the average of the stores that do (one store: its price).
+  // Items no store carries are left out of every total, so totals stay like for like. Filled-in prices are marked est.
+  const real = STORES.map(([name])=>items.map(r=>lineP(name, r)));
+  const st = STORES.map(([name,chain],si)=>{ const lines = items.map((r,i)=>{ const p = real[si][i]; if(p!=null) return {r, p};
+      const others = real.filter((x,j)=>j!==si && STORES[j][0]!=='Aldi in store').map(x=>x[i]).filter(v=>v!=null);
+      if(!others.length) return {r, p:null, none:true};
+      const where = STORES.map(([n],j)=>({n, p:real[j][i]})).filter(x=>x.n!==name && x.n!=='Aldi in store' && x.p!=null).sort((a,b)=>a.p-b.p);
+      return {r, p:Math.round(others.reduce((a,v)=>a+v,0)/others.length*100)/100, est:true, where}; });
+    const priced = lines.filter(l=>l.p!=null), filled = lines.filter(l=>l.est);
+    return {name, chain, lines, total:priced.reduce((a,x)=>a+x.p,0), filled, missing:filled.length}; });
+  const low = {}; items.forEach((r,i)=>{ const v = st.map(x=>x.lines[i]).filter(l=>l.p!=null && !l.est).map(l=>l.p); low[r.f] = v.length ? Math.min(...v) : null; });
   const unpriced = items.filter(r=>!PICKUP.some(s=>(prices[s]||{})[r.f])).length;
   // Recommendation compares pickup orders that priced everything; Aldi in store is its own option.
-  const pick = st.filter(x=>x.name!=='Aldi in store' && !x.missing), inStore = st.find(x=>x.name==='Aldi in store');
+  const pick = st.filter(x=>x.name!=='Aldi in store'), inStore = st.find(x=>x.name==='Aldi in store');
   let rec = '', goIn = '', best = null;
   if(pick.length){
     best = pick.reduce((a,b)=>b.total<a.total?b:a);
@@ -964,15 +972,16 @@ function compareCard(items, trip){
       let tot = 0, na = 0, nb = 0; items.forEach((r,k)=>{ const pa = a.lines[k].p, pb = b.lines[k].p; if(pa<=pb){ tot += pa; na++; } else { tot += pb; nb++; } });
       if(na && nb && (!pair || tot<pair.tot)) pair = {a, b, tot, na, nb}; }));
     const save = pair ? best.total - pair.tot : 0;
-    rec = !pair || save < 1 ? `<b>Stick with ${esc(best.name)}.</b> Splitting into two orders wouldn't save anything.`
+    const extra = best.filled.length ? ` <span style="color:var(--bad)">${best.filled.length===1?'1 item isn\'t':best.filled.length+' items aren\'t'} sold there, so that's a second stop.</span>` : '';
+    rec = !pair || save < 1 ? `<b>Stick with ${esc(best.name)}.</b> Splitting into two orders wouldn't save anything.${extra}`
       : save >= 10 ? `<b>Split it: ${esc(pair.a.name)} (${pair.na} items) + ${esc(pair.b.name)} (${pair.nb} items).</b> Saves about $${save.toFixed(2)} vs. all at ${esc(best.name)}.`
-      : `<b>Stick with ${esc(best.name)}.</b> Splitting between ${esc(pair.a.name)} and ${esc(pair.b.name)} only saves $${save.toFixed(2)}, probably not worth a second stop.`;
-    goIn = inStore && !inStore.missing && best.total - inStore.total >= 1 ? `<div class="small" style="margin-top:6px">Or shop Aldi in person: about $${inStore.total.toFixed(2)} (estimated), roughly $${(best.total-inStore.total).toFixed(2)} less than ${esc(best.name)}${/pickup/.test(best.name)?'':' pickup'}.</div>` : '';
+      : `<b>Stick with ${esc(best.name)}.</b> Splitting between ${esc(pair.a.name)} and ${esc(pair.b.name)} only saves $${save.toFixed(2)}, probably not worth a second stop.${extra}`;
+    goIn = inStore && best.total - inStore.total >= 1 ? `<div class="small" style="margin-top:6px">Or shop Aldi in person: ${inStore.missing?'~':'about '}$${inStore.total.toFixed(2)} (estimated), roughly $${(best.total-inStore.total).toFixed(2)} less than ${esc(best.name)}${/pickup/.test(best.name)?'':' pickup'}.</div>` : '';
   } else rec = 'Some items still need prices. Tap Recalculate.';
   ui._cmp = {best: best && best.name, totals: Object.fromEntries(st.map(x=>[x.name, Math.round(x.total*100)/100]))};
   const key = 'cmp'+trip.date, cartBusy = cart && cart.status!=='done';
-  const rows = st.slice().sort((a,b)=>(a.missing-b.missing)||(a.total-b.total)).map(x=>`<details class="cmp" ${ui.cmpOpen===x.name+key?'open':''}><summary data-act="cmpopen" data-k="${esc(x.name+key)}"><span class="grow1"><b>${esc(x.name)}</b>${x===best?' <span class="pill good">Cheapest pickup</span>':''}${x.missing?` <span class="pill warn">${x.missing} not priced</span>`:''}</span><span class="money" style="margin-left:auto;font-size:17px">$${x.total.toFixed(2)}</span></summary>
-    ${x.lines.map(l=>`<div class="listrow" style="padding:6px 0"><span class="grow1">${esc(l.r.F.n)}<br><span class="small muted">${esc(l.r.packs+' × '+(l.r.F.pl||''))}${x.name!=='Aldi in store'&&(prices[x.name]||{})[l.r.f]?' · '+esc((prices[x.name][l.r.f].name||'').slice(0,40)):''}</span></span><span class="money" style="${l.p!=null&&l.p===low[l.r.f]?'color:var(--good);font-weight:700':''}">${l.p==null?'—':'$'+l.p.toFixed(2)}</span></div>`).join('')}
+  const rows = st.slice().sort((a,b)=>a.total-b.total).map(x=>`<details class="cmp" ${ui.cmpOpen===x.name+key?'open':''}><summary data-act="cmpopen" data-k="${esc(x.name+key)}"><span class="grow1"><b>${esc(x.name)}</b>${x===best?' <span class="pill good">Cheapest pickup</span>':''}${x.missing?` <span class="pill bad">${x.missing} item${x.missing>1?'s':''} missing</span>`:''}</span><span class="money" style="margin-left:auto;font-size:17px;${x.missing?'color:var(--bad)':''}">${x.missing?'~':''}$${x.total.toFixed(2)}</span>${x.missing?`<span class="small" style="flex-basis:100%;order:9;color:var(--bad);line-height:1.35">${x.filled.map(l=>`Not available here: ${esc(l.r.F.n)}${l.where.length?' — get it at '+l.where.map(w=>`${esc(w.n)} ($${w.p.toFixed(2)})`).join(' or '):''}`).join('<br>')}</span>`:''}</summary>
+    ${x.lines.map(l=>`<div class="listrow" style="padding:6px 0"><span class="grow1">${esc(l.r.F.n)}<br><span class="small muted">${esc(l.r.packs+' × '+(l.r.F.pl||''))}${x.name!=='Aldi in store'&&(prices[x.name]||{})[l.r.f]?' · '+esc((prices[x.name][l.r.f].name||'').slice(0,40)):''}${l.est?' · <span style="color:var(--bad)">not sold here, average of other stores</span>':''}</span></span><span class="money" style="${l.est?'color:var(--bad)':l.p!=null&&l.p===low[l.r.f]?'color:var(--good);font-weight:700':''}">${l.p==null?'—':(l.est?'~':'')+'$'+l.p.toFixed(2)}</span></div>`).join('')}
     ${AUTO_CART.includes(x.name) && !x.missing && !cartBusy ? `<button class="btn primary block" style="margin:6px 0 10px" data-act="buildcart" data-trip="${trip.date}" data-store="${esc(x.name)}">Build ${esc(x.name.replace(' pickup',''))} cart</button>` : PICKUP.includes(x.name) ? `<p class="note" style="margin:4px 0 10px">Add these in the ${esc(x.chain)} app. The names above are the matched items.</p>` : ''}</details>`).join('');
   const asOf = (()=>{ const ds_ = []; PICKUP.forEach(s=>items.forEach(r=>{ const x=(prices[s]||{})[r.f]; if(x&&x.at) ds_.push(x.at); })); ds_.sort(); return ds_.length ? `Prices as of ${nice(ds_[0].slice(0,10))}` : ''; })();
   const cartLine = !cart ? '' : cartBusy ? `<div class="status" style="margin-top:8px"><span style="flex:1"><b>Building your ${esc(cart.store.replace(' pickup',''))} cart…</b></span></div>`
@@ -980,7 +989,7 @@ function compareCard(items, trip){
   return `<div class="card"><div class="eyebrow">Compare stores ${asOf?`<span class="pill good">${esc(asOf)}</span>`:''}</div>
     <div class="banner prep" style="margin:6px 0 8px"><div>${rec}${goIn}${unpriced?`<div class="small" style="margin-top:6px">${unpriced} checked item${unpriced>1?'s have':' has'} no price yet. Recalculate to look ${unpriced>1?'them':'it'} up.</div>`:''}</div></div>${rows}${cartLine}
     <div style="margin-top:8px">${btn}</div>
-    <p class="note" style="margin:6px 0 0">Only checked items are priced. Green = lowest price for that item. Aldi in store is estimated about 12% under Aldi pickup.</p></div>`;
+    <p class="note" style="margin:6px 0 0">Only checked items are priced. Green = lowest price for that item. Red ~ = not sold at that store, estimated from the others. Aldi in store is estimated about 12% under Aldi pickup.</p></div>`;
 }
 // One shopping week's list: rows by category (Midweek = the fresh trip), pantry/freezer checks and seasonings.
 function groceryData(ci){
