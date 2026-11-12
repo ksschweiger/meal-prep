@@ -112,6 +112,7 @@ main{padding-block:14px 110px}
 .wk{padding:4px 6px}.wk table{width:100%;border-collapse:collapse;table-layout:fixed}.wk thead th{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);text-align:left;padding:6px 6px}.wk thead th:first-child{width:62px}
 .wk td,.wk tbody th{border-top:1px solid var(--line);padding:4px;vertical-align:top}.wk tr.today{background:var(--sunk)}
 .wkmeal,.wkday{display:flex;flex-direction:column;align-items:flex-start;gap:1px;width:100%;text-align:left;background:none;border:0;padding:4px 2px;line-height:1.25;color:inherit;font:inherit}.wkmeal b{font-size:14px}.wkday .badges{display:flex;gap:2px;margin-top:2px}.wk td.muted{padding:8px 6px;font-size:14px}
+.serve{padding:10px 12px;margin-top:8px}.serve table{width:100%;border-collapse:collapse;margin-top:4px}.serve th{font-size:13px;text-align:left;padding:4px 4px}.serve td{border-top:1px solid var(--line);padding:6px 4px;font-size:14px;vertical-align:top}.serve td:first-child{font-weight:600;width:34%}
 .psec{margin-top:16px}.psec>.pname{display:flex;align-items:center;gap:8px;font-size:20px;border-bottom:2px solid var(--pc);padding-bottom:4px}.psec>.pname .pdot{background:var(--pc);width:12px;height:12px}
 .dayhead h2{font-size:22px;flex:1;text-align:center}
 .banner{display:flex;gap:10px;align-items:flex-start;border-radius:10px;padding:10px 12px;font-size:14px}
@@ -283,7 +284,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-11h';
+const APP_VERSION = '2026-11-11i';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -824,6 +825,14 @@ function vWeek(){
 
 // ---------- New day page: a section per person with all their meals ----------
 const SECTIONS = {K:[['Breakfast',['c','kb']],['Lunch',['l']],['Dinner',['d']],['Snack',['ks']]], Y:[['Breakfast',['c','yb']],['Lunch',['l']],['Dinner',['d']],['Snack',['ys']]]};
+// Serving table for a shared meal: one row per part of the meal, one column per person eating it.
+function servingCard(d,k,label){
+  if(isFlex(d,k) || isSkipped(d,k)) return '';
+  const ppl = eaters(d,k); if(ppl.length<2) return '';
+  const G = groups(d,k), cell = (g,p) => g.cooks || g.each || g.scoop ? fmtPortion(g,p) : g.comps.filter(c=>cg(c,p)>0).map(c=>household(c[0],raw(d,p,c))).join(' + ') || '—';
+  const rows = G.list.flatMap(g => g.cooks || g.each || g.scoop ? [[g.name, ppl.map(p=>cell(g,p))]] : g.comps.map(c=>[FOODS[c[0]].n, ppl.map(p=>cg(c,p)>0?household(c[0],raw(d,p,c)):'—')]));
+  return `<div class="card serve"><div class="eyebrow">${label} · ${esc(G.meal.n)}</div><table><thead><tr><th></th>${ppl.map(p=>`<th style="color:${PC[p]}">${NAMES[p]}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r[0])}</td>${r[1].map(v=>`<td>${String(v).replace(/^about /,'').replace(/ \(([^)]+)\)/,'<br><span class="small muted">$1</span>')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+}
 function vDay2(){
   const d = ui.sel, day = S.plan.days[d];
   const head = `<div class="dayhead"><button class="iconbtn" data-act="dnav" data-dir="-1" aria-label="Previous day">${I.left}</button><h2>${nice(d)}</h2><button class="iconbtn" data-act="dnav" data-dir="1" aria-label="Next day">${I.right}</button></div><div style="text-align:center"><button class="linkbtn" data-act="daylayout" data-v="day">Old day layout ›</button></div>`;
@@ -844,7 +853,8 @@ function vDay2(){
         return mealCard(d,k,p); }).join('');
       return items ? `<div class="eyebrow" style="margin-top:10px">${label}</div>${items}` : ''; }).join('');
     return `<section class="slot psec" style="--pc:${PC[p]}"><h2 class="pname"><span class="pdot"></span>${NAMES[p]}</h2>${parts}</section>`; };
-  return head + seg + lockb + wk + banners + mac + ppl.map(section).join('');
+  const serve = servingCard(d,'l','Lunch') + servingCard(d,'d','Dinner');
+  return head + seg + lockb + wk + banners + mac + (serve ? `<div class="eyebrow" style="margin-top:14px">Serving</div>${serve}` : '') + ppl.map(section).join('');
 }
 
 // ---------- Shopping stats (from shopLog, ratings and the plan) ----------
