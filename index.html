@@ -284,7 +284,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-11l';
+const APP_VERSION = '2026-11-11m';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -836,7 +836,7 @@ function servingCard(d,k,label){
   const G = groups(d,k), fmt = v => String(v).replace(/^about /,'').replace(/ \(([^)]+)\)/,'<br><span class="small muted">$1</span>');
   const rows = G.list.flatMap(g => g.cooks || g.each || g.scoop ? [[g.name, p=>fmtPortion(g,p)]] : g.comps.map(c=>[FOODS[c[0]].n, p=>cg(c,p)>0?household(c[0],raw(d,p,c)):'—']));
   const off = all.filter(p=>!ppl.includes(p));
-  const body = rows.map((r,i)=>`<tr><td>${esc(r[0])}</td>${all.map(p=>ppl.includes(p) ? `<td>${fmt(r[1](p))}</td>` : i===0 ? `<td class="off" rowspan="${rows.length}">${why(p)}</td>` : '').join('')}</tr>`).join('');
+  const body = rows.map((r,i)=>`<tr><td>${esc(r[0])}</td>${all.map(p=>ppl.includes(p) ? `<td>${fmt(r[1](p))}</td>` : `<td class="muted">${why(p)}</td>`).join('')}</tr>`).join('');
   const open = !!(ui.serveOpen||{})[d+'|'+k];
   return `<div class="card serve" id="${sid}"><div class="eyebrow">${label}${off.length?'':''}</div><h3 style="margin:2px 0 4px">${esc(G.meal.n)}</h3>
     <table><thead><tr><th></th>${all.map(p=>`<th style="color:${PC[p]}">${NAMES[p]}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table>
