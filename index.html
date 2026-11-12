@@ -109,6 +109,10 @@ main{padding-block:14px 110px}
 
 /* Day */
 .dayhead{display:flex;align-items:center;gap:8px}
+.wk{padding:4px 6px}.wk table{width:100%;border-collapse:collapse;table-layout:fixed}.wk thead th{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);text-align:left;padding:6px 6px}.wk thead th:first-child{width:62px}
+.wk td,.wk tbody th{border-top:1px solid var(--line);padding:4px;vertical-align:top}.wk tr.today{background:var(--sunk)}
+.wkmeal,.wkday{display:flex;flex-direction:column;align-items:flex-start;gap:1px;width:100%;text-align:left;background:none;border:0;padding:4px 2px;line-height:1.25;color:inherit;font:inherit}.wkmeal b{font-size:14px}.wkday .badges{display:flex;gap:2px;margin-top:2px}.wk td.muted{padding:8px 6px;font-size:14px}
+.psec{margin-top:16px}.psec>.pname{display:flex;align-items:center;gap:8px;font-size:20px;border-bottom:2px solid var(--pc);padding-bottom:4px}.psec>.pname .pdot{background:var(--pc);width:12px;height:12px}
 .dayhead h2{font-size:22px;flex:1;text-align:center}
 .banner{display:flex;gap:10px;align-items:flex-start;border-radius:10px;padding:10px 12px;font-size:14px}
 .banner svg{width:18px;height:18px;flex:none;margin-top:1px}
@@ -214,8 +218,8 @@ details.cmp[open] summary::after{transform:rotate(90deg)}
 
 /* Nav */
 .tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
-.tabs .wrap{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));padding-block:4px}
-.tabs button{border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;font-size:11px;font-weight:700;color:var(--muted)}
+.tabs .wrap{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));padding-block:4px}
+.tabs button{border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;font-size:10.5px;font-weight:700;color:var(--muted)}
 .tabs button svg{width:22px;height:22px}
 .tabs button.on{color:var(--accent)}
 
@@ -279,7 +283,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-11a';
+const APP_VERSION = '2026-11-11b';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -542,8 +546,9 @@ function monthPairing(date){
   for(const d of ds_){ const day = S.plan.days[d]; if(d<TODAY || isFlex(d,'d') || isSkipped(d,'d') || dow(d)===2) continue; const m = MEALS[day.d]; if(m.pair) return {date:d, id:day.d}; }
   return null;
 }
-// Drink night: one dinner a month, picked automatically.
+// Drink night: turned off (no alcohol pairings).
 function isDrinkNight(d){
+  return false; // Drink pairings turned off.
   const day = S.plan.days[d]; if(!day || isFlex(d,'d') || isSkipped(d,'d') || !MEALS[day.d].pair) return false;
   const a = monthPairing(d); return !!a && a.date===d;
 }
@@ -668,13 +673,13 @@ const fmtTime = iso => { const d = new Date(iso); return nice(ds(d))+', '+d.toLo
 
 // ---------- Views ----------
 // Day isn't in the tab bar: open a day from the calendar.
-const TABS = [['calendar','Calendar',I.cal],['groceries','Groceries',I.cart],['stats','Stats',I.chart],['pantry','Pantry',I.jar],['macros','Macros',I.gauge],['settings','Settings',I.gear]];
+const TABS = [['calendar','Calendar',I.cal],['week','Week',I.day],['groceries','Groceries',I.cart],['stats','Stats',I.chart],['pantry','Pantry',I.jar],['macros','Macros',I.gauge],['settings','Settings',I.gear]];
 function render(){
   ui._trips = null;
   applyTallow();
   document.getElementById('tabs').innerHTML = TABS.map(t=>`<button data-act="tab" data-tab="${t[0]}" class="${ui.tab===t[0]?'on':''}" aria-label="${t[1]}">${t[2]}<span>${t[1]}</span></button>`).join('');
   const v = document.getElementById('view');
-  v.innerHTML = '<div class="view">'+({calendar:vCalendar,day:vDay,stats:vStats,groceries:vGroceries,pantry:vPantry,macros:vMacros,settings:vSettings}[ui.tab])()+'</div>';
+  v.innerHTML = '<div class="view">'+({calendar:vCalendar,week:vWeek,day2:vDay2,day:vDay,stats:vStats,groceries:vGroceries,pantry:vPantry,macros:vMacros,settings:vSettings}[ui.tab])()+'</div>';
   updateDot();
 }
 
@@ -698,7 +703,7 @@ function vCalendar(){
   return `
   <div class="calhead"><button class="iconbtn" data-act="mon" data-dir="-1" aria-label="Previous month">${I.left}</button><h2>${MON[m]} ${y}</h2><button class="iconbtn" data-act="mon" data-dir="1" aria-label="Next month">${I.right}</button></div>
   <div><div class="dows">${DOW.map(d=>`<div>${d}</div>`).join('')}</div><div class="cal" style="margin-top:4px">${cells}</div></div>
-  <div class="legend"><span><span class="b prep">${I.pot}</span>Prep day</span><span><span class="b shop">${I.cart}</span>Shop / pickup</span><span><span class="b thaw">${I.snow}</span>Thaw</span><span><span class="b drink">${GLASS.red[1]}</span>Drink pairing</span><span>↳ Leftovers</span></div>
+  <div class="legend"><span><span class="b prep">${I.pot}</span>Prep day</span><span><span class="b shop">${I.cart}</span>Shop / pickup</span><span><span class="b thaw">${I.snow}</span>Thaw</span><span>↳ Leftovers</span></div>
   <p class="note">Tap any day to see portions.</p>`;
 }
 
@@ -715,12 +720,13 @@ function personSummary(date,p){
 const SRC_NAMES = {'spendwithpennies.com':'Spend With Pennies'};
 function srcName(u){ try { const h = new URL(u).hostname.replace(/^www\./,''); return 'the original recipe on '+(SRC_NAMES[h]||h); } catch(e){ return 'the original recipe'; } }
 
-function mealCard(date,key){
+function mealCard(date,key,only){
   const G = groups(date,key), m = G.meal, persons = KEY_PERSONS[key], fam = key==='d', r = S.ratings[G.id]||0;
   const run = G.run, idx = run.indexOf(date), cyc = S.plan.cycles[cycleOf(run[0])];
   const who = fam ? `<div class="who" style="--pc:var(--accent)">Family dinner</div>` : key==='l' ? `<div class="who" style="--pc:var(--accent)">Shared lunch · Kaleb & Kayla</div>` : key==='c' ? `<div class="who" style="--pc:var(--accent)">Both of you · every morning</div>` : `<div class="who" style="--pc:${PC[persons[0]]}"><span class="pdot"></span>${NAMES[persons[0]]}</div>`;
   const tags = (m.style?`<span class="tag style" style="--sc:${STYLE_COLOR[m.style]}">${m.style}</span>`:'')+`<span class="tag">${m.tool}</span>`+(run.length>1&&key!=='c'?`<span class="tag">Day ${idx+1} of ${run.length}</span>`:'');
-  const vis = eaters(date,key).filter(shows);
+  // only = a person's section on the new day page: show just their portion (Kayla's dinner also shows Landen's).
+  const vis = only ? eaters(date,key).filter(x=>x===only || (only==='Y' && x==='L')) : eaters(date,key).filter(shows);
   const tape = (p,txt) => `<span class="tape" style="--pc:${PC[p]}"><b title="${NAMES[p]}">${TAPE_LETTER[p]||p}</b>${txt}</span>`;
   const rows = G.list.map(g=> g.cooks || g.each || g.scoop
     ? `<div class="grow"><span class="gname">${esc(g.name)}</span><span class="tapes">${vis.map(p=>tape(p,fmtPortion(g,p))).join('')}</span></div>`
@@ -741,15 +747,15 @@ function mealCard(date,key){
     return `<div class="ch"><span class="t">${esc(g.name)}</span><input class="numin" inputmode="numeric" id="ck-${esc(G.runId+'-'+g.name).replace(/[^a-z0-9]/gi,'_')}" data-act="cooked" data-run="${esc(G.runId)}" data-grp="${esc(g.name)}" placeholder="${Math.round(g.exp)}" value="${g.actual||''}" aria-label="Cooked weight of ${esc(g.name)} in grams"><span class="s">${g.comps.some(c=>isMeat(c[0])) ? `Whole batch: ${Math.round(g.batchRaw)} g raw → about ${Math.round(g.exp)} g cooked. Enter the real cooked weight, minus the empty pot or container.` : `Whole batch: ${g.comps.length===1 ? household(g.comps[0][0], g.batchRaw) : 'see ingredients'} → about ${cupsOf(g.exp, COOKED_G_PER_CUP[g.comps[0][0]]||150)} cooked. Portions are in cups, so weighing is optional.`}${meat?'<br>'+meat:''}</span></div>`;
   }).join('');
   const tareTip = G.list.some(g=>g.cooks) ? `<div class="tare"><b>Before you start:</b> weigh each empty pot, pan or container you'll store the cooked food in and write it down, so you can subtract it when you weigh the finished batch.</div>` : '';
-  const okey = date+'|'+key;
+  const okey = date+'|'+key+(only?'|'+only:''), aid = 'm-'+okey.replace(/[^a-z0-9]/gi,'_');
   if(!ui.mealOpen[okey] && !isSkipped(date,key)){
     const whoTxt = fam ? 'Family dinner' : key==='l' ? 'Shared lunch' : key==='c' ? 'Every morning' : NAMES[persons[0]];
     const dotc = fam||key==='l'||key==='c' ? 'var(--accent)' : PC[persons[0]];
     const cookToday = key!=='c' && persons.length>1 && date===cyc.start && run[0]===cyc.start;
-    return `<button class="mealrow" data-act="mopen" data-k="${okey}" aria-expanded="false"><span class="pdot" style="--pc:${dotc}"></span><span class="grow1"><span class="small muted">${whoTxt}${run.length>1&&key!=='c'?` · day ${idx+1} of ${run.length}`:''}${cookToday?' · <b style="color:var(--prep)">cook today</b>':''}</span><br><b>${esc(m.n)}</b></span>${r===1?`<span style="color:var(--accent)">${I.up.replace('<svg','<svg width="16" height="16"')}</span>`:''}<span class="chev">›</span></button>`;
+    return `<button id="${aid}" class="mealrow" data-act="mopen" data-k="${okey}" aria-expanded="false"><span class="pdot" style="--pc:${dotc}"></span><span class="grow1"><span class="small muted">${whoTxt}${run.length>1&&key!=='c'?` · day ${idx+1} of ${run.length}`:''}${cookToday?' · <b style="color:var(--prep)">cook today</b>':''}</span><br><b>${esc(m.n)}</b></span>${r===1?`<span style="color:var(--accent)">${I.up.replace('<svg','<svg width="16" height="16"')}</span>`:''}<span class="chev">›</span></button>`;
   }
   if(isSkipped(date,key)) return `<article class="meal" style="opacity:.7;border-style:dashed"><div class="mtop"><div class="mtitle">${who}<h3 style="text-decoration:line-through">${esc(m.n)}</h3><div class="note">Skipped. Leftovers roll into next week's plan.</div></div><button class="btn" style="padding:6px 12px" data-act="skip" data-date="${date}" data-key="${key}">Undo</button></div></article>`;
-  return `<article class="meal ${fam?'family':''}">
+  return `<article id="${aid}" class="meal ${fam?'family':''}">
     <div class="mtop"><div class="mtitle" data-act="mopen" data-k="${okey}" role="button" aria-expanded="true" style="cursor:pointer">${who}<h3>${esc(m.n)} <span class="chev" style="display:inline-block;transform:rotate(90deg)">›</span></h3><div class="tags">${tags}</div></div>
       <div class="actions">
         <button class="iconbtn ${r===1?'on-up':''}" data-act="rate" data-id="${G.id}" data-v="1" aria-label="Like" aria-pressed="${r===1}">${I.up}</button>
@@ -770,13 +776,17 @@ function mealCard(date,key){
   </article>`;
 }
 
-function vDay(){
-  const d = ui.sel, day = S.plan.days[d];
-  const head = `<div class="dayhead"><button class="iconbtn" data-act="dnav" data-dir="-1" aria-label="Previous day">${I.left}</button><h2>${nice(d)}</h2><button class="iconbtn" data-act="dnav" data-dir="1" aria-label="Next day">${I.right}</button></div>`;
+function dayBanners(d){
   const mk = markers(d); let banners = '';
   if(mk.prep){ const c = S.plan.cycles[cycleOf(d)], ms = new Set(); for(let x=c.start;x<=c.end;x=add(x,1)) Object.keys(KEY_SLOT).forEach(k=>{ if(isFlex(x,k) || isCarry(x,k)) return; const mm = MEALS[S.plan.days[x][k]]; if(mm.tool!=='No cook' && mm.tool!=='Make day-of') ms.add(mm.n); }); banners += `<div class="banner prep">${I.pot}<div><b>Prep day</b>Cook: ${[...ms].map(esc).join(', ')}.</div></div>`; }
   if(mk.thaw){ const nc = S.plan.cycles[mk.next]; banners += `<div class="banner thaw">${I.snow}<div><b>Move to the fridge tonight</b>${mk.items.map(t=>`${esc(FOODS[t.f].n)} ${FOODS[t.f].thawEach ? (n=>n+' '+(n>1?FOODS[t.f].thawUnit[1]:FOODS[t.f].thawUnit[0]))(Math.max(1,Math.ceil(t.need/FOODS[t.f].thawEach - .2))) : t.lb+' lb'} <span class="small muted">for ${nice(t.for)}</span>`).join(' · ')}</div></div>`; }
   if(mk.shop){ const tr = ui._trips[mk.trip]; banners += `<div class="banner shop">${I.cart}<div><b>${tr.kind==='mid'?'Midweek fresh trip':'Shopping day'}</b><button class="linkbtn" data-act="goList" data-ti="${mk.trip}">See the list</button></div></div>`; }
+  return banners;
+}
+function vDay(){
+  const d = ui.sel, day = S.plan.days[d];
+  const head = `<div class="dayhead"><button class="iconbtn" data-act="dnav" data-dir="-1" aria-label="Previous day">${I.left}</button><h2>${nice(d)}</h2><button class="iconbtn" data-act="dnav" data-dir="1" aria-label="Next day">${I.right}</button></div><div style="text-align:center"><button class="linkbtn" data-act="tab" data-tab="day2">Try the new day layout ›</button></div>`;
+  let banners = dayBanners(d);
   if(!day) return head + banners + '<div class="card muted">No meals planned for this day.</div>';
   const flexCard = k => `<article class="meal" style="border-style:dashed"><div class="mtop"><div class="mtitle">${k==='d'||k==='l'?`<div class="who" style="--pc:var(--accent)">${k==='d'?'Family dinner':'Shared lunch'}</div>`:`<div class="who" style="--pc:${PC[KEY_PERSONS[k][0]]}"><span class="pdot"></span>${NAMES[KEY_PERSONS[k][0]]}</div>`}<h3>${k==='ys'?'Nothing planned':!eaters(d,k).length?'Away':S.plan.days[d].off?'Open':'Flex'}</h3><div class="note">${k==='ys'?'Snacks are off for now.':!eaters(d,k).length?`${NAMES[KEY_PERSONS[k][0]]} is away today. Nothing planned.`:S.plan.days[d].off?'Plan pushed back a day. Use leftovers or eat out.':'Eat leftovers from the week first, then whatever fits the day.'}</div></div></div></article>`;
   const mp = {id:day.d}, drink = isDrinkNight(d) ? (()=>{ const x = MEALS[mp.id].pair; return `<button class="drinkcard" data-act="drink" data-id="${mp.id}"><span class="b drink" style="width:28px;height:28px;border-radius:8px">${GLASS[x.glass][1]}</span><span class="grow1"><b>${esc(x.n)}</b> <span class="small muted">· ${x.kind} pairing</span></span><span class="small" style="color:var(--accent);font-weight:700">Recipe ›</span></button>`; })() : '';
@@ -787,6 +797,49 @@ function vDay(){
   return head + seg + lockb + wk + banners +
     `<div class="card"><div class="sum" ${S.view.mode==='mine'?'style="grid-template-columns:1fr"':''}>${['K','Y'].filter(shows).map(p=>personSummary(d,p)).join('')}</div><p class="note" style="margin:10px 0 0">${(day.away||[]).length?`${day.away.map(p=>NAMES[p]).join(' & ')} away today: shared meals are sized without ${day.away.length>1?'them':'him'}. `:''}Landen eats dinner only, at ${S.settings.landen}% of Kayla's portion.</p></div>` +
     slot('Breakfast',['c','kb','yb']) + slot('Lunch',['l']) + slot('Dinner',['d']) + slot('Snacks',['ks','ys']);
+}
+
+
+// ---------- Week at a glance (Mon–Sun) ----------
+const monOf = d => add(d, -((dow(d)+6)%7));
+function vWeek(){
+  const w0 = ui.wk || (ui.wk = monOf(TODAY)), days = [...Array(7)].map((_,i)=>add(w0,i));
+  const cell = (d,k) => { const day = S.plan.days[d];
+    if(!day) return `<td class="muted">—</td>`;
+    if(isFlex(d,k) || !eaters(d,k).length) return `<td class="muted">${!eaters(d,k).length && !isFlex(d,k) ? 'Away' : 'Flex'}</td>`;
+    const m = MEALS[day[k]], run = getRun(d,k), cont = run[0]!==d, who = eaters(d,k).map(p=>NAMES[p]).join(', ');
+    return `<td><button class="wkmeal" data-act="wkmeal" data-date="${d}" data-k="${k}"><b>${cont?'↳ ':''}${esc(m.s||m.n)}</b><span class="small muted">${esc(who)}</span></button></td>`; };
+  const rows = days.map(d=>{ const mk = markers(d), b = (mk.prep?`<span class="b prep" title="Cook">${I.pot}</span>`:'')+(mk.shop?`<span class="b shop" title="Shop">${I.cart}</span>`:'')+(mk.thaw?`<span class="b thaw" title="Thaw tonight">${I.snow}</span>`:'');
+    return `<tr class="${d===TODAY?'today':''}"><th><button class="wkday" data-act="wkday" data-date="${d}"><b>${DOW[dow(d)]}</b><span class="small muted">${pd(d).getMonth()+1}/${pd(d).getDate()}</span><span class="badges">${b}</span></button></th>${cell(d,'l')}${cell(d,'d')}</tr>`; }).join('');
+  return `<div class="dayhead"><button class="iconbtn" data-act="wnav" data-dir="-7" aria-label="Previous week">${I.left}</button><h2>Week of ${MON[pd(w0).getMonth()].slice(0,3)} ${pd(w0).getDate()}</h2><button class="iconbtn" data-act="wnav" data-dir="7" aria-label="Next week">${I.right}</button></div>
+  <div class="card wk"><table><thead><tr><th></th><th>Lunch</th><th>Dinner</th></tr></thead><tbody>${rows}</tbody></table></div>
+  <div class="legend"><span><span class="b prep">${I.pot}</span>Cook</span><span><span class="b shop">${I.cart}</span>Shop</span><span><span class="b thaw">${I.snow}</span>Thaw tonight</span><span>↳ Leftovers</span></div>
+  <p class="note">Tap a meal to open it, or a day to see everything.</p>`;
+}
+
+// ---------- New day page: a section per person with all their meals ----------
+const SECTIONS = {K:[['Breakfast',['c','kb']],['Lunch',['l']],['Dinner',['d']],['Snack',['ks']]], Y:[['Breakfast',['c','yb']],['Lunch',['l']],['Dinner',['d']],['Snack',['ys']]]};
+function vDay2(){
+  const d = ui.sel, day = S.plan.days[d];
+  const head = `<div class="dayhead"><button class="iconbtn" data-act="dnav" data-dir="-1" aria-label="Previous day">${I.left}</button><h2>${nice(d)}</h2><button class="iconbtn" data-act="dnav" data-dir="1" aria-label="Next day">${I.right}</button></div><div style="text-align:center"><button class="linkbtn" data-act="tab" data-tab="day">Old day layout ›</button></div>`;
+  const banners = dayBanners(d);
+  if(!day) return head + banners + '<div class="card muted">No meals planned for this day.</div>';
+  const seg = `<div class="seg"><button class="${S.view.mode==='mine'?'on':''}" data-act="vmode" data-v="mine">Just ${NAMES[S.view.me]}</button><button class="${S.view.mode==='both'?'on':''}" data-act="vmode" data-v="both">Both of us</button></div>`;
+  const wk = isWeekend(d) && S.settings.weekend!=='full' ? `<div class="banner prep">${I.cal}<div><b>Light weekend</b>${S.settings.weekend!=='none'?'Only dinner is planned. Use up leftovers from missed meals for the rest.':'Nothing planned. Use up leftovers from the week.'}</div></div>` : '';
+  const lockb = isLocked(d) ? `<div class="banner shop">${I.cart}<div><b>Shopping done · week locked</b>Swaps only use food you bought. New requests go to next week.</div></div>` : '';
+  const ppl = ['K','Y'].filter(shows);
+  const mac = `<button class="mealrow" data-act="macshow" aria-expanded="${!!ui.macShow}"><span class="grow1"><b>Macros</b> <span class="small muted">${ppl.map(p=>isAway(d,p)?NAMES[p]+' away':NAMES[p]+' '+Math.round(dayMacros(d,p).k).toLocaleString()+' cal').join(' · ')}</span></span><span class="chev" style="${ui.macShow?'transform:rotate(90deg)':''}">›</span></button>`
+    + (ui.macShow ? `<div class="card" style="margin-top:8px"><div class="sum" ${ppl.length<2?'style="grid-template-columns:1fr"':''}>${ppl.map(p=>personSummary(d,p)).join('')}</div></div>` : '');
+  const empty = (txt,sub) => `<div class="mealrow" style="border-style:dashed;box-shadow:none"><span class="grow1"><b>${txt}</b><br><span class="small muted">${sub}</span></span></div>`;
+  const section = p => {
+    if(isAway(d,p)) return `<section class="slot psec" style="--pc:${PC[p]}"><h2 class="pname"><span class="pdot"></span>${NAMES[p]}</h2>${empty('Away today','Nothing planned.')}</section>`;
+    const parts = SECTIONS[p].map(([label,keys])=>{ const items = keys.filter(k=>KEY_PERSONS[k].includes(p) && (['l','d','kb','yb'].includes(k) || (day[k] && day[k]!=='none' && !isFlex(d,k)))).map(k=>{
+        if(!eaters(d,k).includes(p)) return isFlex(d,k) ? empty('Flex','Eat leftovers from the week first, then whatever fits the day.') : empty('Out','Not eating this one at home.');
+        if(isFlex(d,k)) return empty('Flex','Eat leftovers from the week first, then whatever fits the day.');
+        return mealCard(d,k,p); }).join('');
+      return items ? `<div class="eyebrow" style="margin-top:10px">${label}</div>${items}` : ''; }).join('');
+    return `<section class="slot psec" style="--pc:${PC[p]}"><h2 class="pname"><span class="pdot"></span>${NAMES[p]}</h2>${parts}</section>`; };
+  return head + seg + lockb + wk + banners + mac + ppl.map(section).join('');
 }
 
 // ---------- Shopping stats (from shopLog, ratings and the plan) ----------
@@ -1150,6 +1203,12 @@ document.addEventListener('click', e=>{
   if(a==='tab'){ ui.tab = t.dataset.tab; render(); window.scrollTo(0,0); }
   else if(a==='mon'){ let [y,m] = ui.ym; m += +t.dataset.dir; if(m<0){m=11;y--} if(m>11){m=0;y++} ui.ym = [y,m]; render(); }
   else if(a==='pick'){ const pm = markers(t.dataset.date); if(!S.plan.days[t.dataset.date] && !pm.thaw && !pm.shop) return; ui.sel = t.dataset.date; ui.tab = 'day'; render(); window.scrollTo(0,0); }
+  else if(a==='wnav'){ ui.wk = add(ui.wk, +t.dataset.dir); render(); }
+  else if(a==='wkday'){ ui.sel = t.dataset.date; ui.tab = 'day2'; render(); window.scrollTo(0,0); }
+  else if(a==='wkmeal'){ const d = t.dataset.date, k = t.dataset.k; ui.sel = d; ui.tab = 'day2'; ['K','Y'].forEach(p=>{ ui.mealOpen[d+'|'+k+'|'+p] = true; }); render();
+    const p = ['K','Y'].filter(shows).find(x=>eaters(d,k).includes(x)), el = p && document.getElementById('m-'+(d+'|'+k+'|'+p).replace(/[^a-z0-9]/gi,'_'));
+    if(el){ const hd = document.querySelector('header.top'); window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - (hd?hd.offsetHeight:0) - 50); } else window.scrollTo(0,0); }
+  else if(a==='macshow'){ ui.macShow = !ui.macShow; const sc = window.scrollY; render(); window.scrollTo(0,sc); }
   else if(a==='dnav'){ const n = add(ui.sel, +t.dataset.dir); if(S.plan.days[n]){ ui.sel = n; render(); } }
   else if(a==='trip'){ ui.trip = +t.dataset.i; render(); }
   else if(a==='gnav'){ ui.gc = Math.max(0, Math.min(shopWeeks().length-1, ui.gc + +t.dataset.dir)); render(); }
