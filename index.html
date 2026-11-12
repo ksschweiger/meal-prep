@@ -109,6 +109,7 @@ main{padding-block:14px 110px}
 
 /* Day */
 .dayhead{display:flex;align-items:center;gap:8px}
+.calseg{margin-bottom:14px}
 .wk{padding:4px 6px}.wk table{width:100%;border-collapse:collapse;table-layout:fixed}.wk thead th{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);text-align:left;padding:6px 6px}.wk thead th:first-child{width:62px}
 .wk td,.wk tbody th{border-top:1px solid var(--line);padding:4px;vertical-align:top}.wk tr.today{background:var(--sunk)}
 .wkmeal,.wkday{display:flex;flex-direction:column;align-items:flex-start;gap:1px;width:100%;text-align:left;background:none;border:0;padding:4px 2px;line-height:1.25;color:inherit;font:inherit}.wkmeal b{font-size:14px}.wkday .badges{display:flex;gap:2px;margin-top:2px}.wk td.muted{padding:8px 6px;font-size:14px}
@@ -220,8 +221,8 @@ details.cmp[open] summary::after{transform:rotate(90deg)}
 
 /* Nav */
 .tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
-.tabs .wrap{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));padding-block:4px}
-.tabs button{border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;font-size:10.5px;font-weight:700;color:var(--muted)}
+.tabs .wrap{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));padding-block:4px}
+.tabs button{border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;font-size:11px;font-weight:700;color:var(--muted)}
 .tabs button svg{width:22px;height:22px}
 .tabs button.on{color:var(--accent)}
 
@@ -285,7 +286,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-11r';
+const APP_VERSION = '2026-11-11s';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -679,14 +680,19 @@ const fmtTime = iso => { const d = new Date(iso); return nice(ds(d))+', '+d.toLo
 
 // ---------- Views ----------
 // Day isn't in the tab bar: open a day from the calendar.
-const TABS = [['calendar','Calendar',I.cal],['week','Week',I.day],['groceries','Groceries',I.cart],['stats','Stats',I.chart],['pantry','Pantry',I.jar],['macros','Macros',I.gauge],['settings','Settings',I.gear]];
+const TABS = [['calendar','Calendar',I.cal],['groceries','Groceries',I.cart],['stats','Stats',I.chart],['pantry','Pantry',I.jar],['macros','Macros',I.gauge],['settings','Settings',I.gear]];
+// Calendar tab has three views picked at the top: Month, Week, Day (the day page uses whichever layout was last chosen).
+const CAL_TABS = ['calendar','week','day','day2'];
+const calSeg = () => { const v = ui.tab==='calendar' ? 'month' : ui.tab==='week' ? 'week' : 'day';
+  return `<div class="seg calseg">${[['month','Month'],['week','Week'],['day','Day']].map(([k,l])=>`<button class="${v===k?'on':''}" data-act="calview" data-v="${k}">${l}</button>`).join('')}</div>`; };
 function render(){
   ui._trips = null;
   applyTallow();
-  document.getElementById('tabs').innerHTML = TABS.map(t=>`<button data-act="tab" data-tab="${t[0]}" class="${ui.tab===t[0]?'on':''}" aria-label="${t[1]}">${t[2]}<span>${t[1]}</span></button>`).join('');
+  document.getElementById('tabs').innerHTML = TABS.map(t=>`<button data-act="tab" data-tab="${t[0]}" class="${ui.tab===t[0] || (t[0]==='calendar' && CAL_TABS.includes(ui.tab))?'on':''}" aria-label="${t[1]}">${t[2]}<span>${t[1]}</span></button>`).join('');
   const v = document.getElementById('view');
   v.style.touchAction = ['week','day','day2'].includes(ui.tab) ? 'pan-y' : '';
-  v.innerHTML = '<div class="view">'+({calendar:vCalendar,week:vWeek,day2:vDay2,day:vDay,stats:vStats,groceries:vGroceries,pantry:vPantry,macros:vMacros,settings:vSettings}[ui.tab])()+'</div>';
+  if(CAL_TABS.includes(ui.tab)) ui.calLast = ui.tab;
+  v.innerHTML = (CAL_TABS.includes(ui.tab) ? calSeg() : '')+'<div class="view">'+({calendar:vCalendar,week:vWeek,day2:vDay2,day:vDay,stats:vStats,groceries:vGroceries,pantry:vPantry,macros:vMacros,settings:vSettings}[ui.tab])()+'</div>';
   updateDot();
 }
 
@@ -1266,7 +1272,12 @@ document.addEventListener('click', e=>{
   const a = t.dataset.act;
   if(a==='closeSheet'){ if(e.target===t || t.tagName==='BUTTON') closeSheet(); return; }
   if(['cooked','mac','macg','budget','store','check','drinkon','prof','spoz','receipt','fzpri'].includes(a)) return;
-  if(a==='tab'){ ui.tab = t.dataset.tab; render(); window.scrollTo(0,0); }
+  if(a==='tab'){ ui.tab = t.dataset.tab==='calendar' && ui.calLast && !CAL_TABS.includes(ui.tab) ? ui.calLast : t.dataset.tab; render(); window.scrollTo(0,0); }
+  else if(a==='calview'){ const v = t.dataset.v;
+    if(v==='month'){ ui.tab = 'calendar'; const x = pd(ui.sel||TODAY); ui.ym = [x.getFullYear(), x.getMonth()]; }
+    else if(v==='week'){ ui.wk = monOf(ui.tab==='calendar' ? TODAY : ui.sel); ui.tab = 'week'; }
+    else { if(ui.tab==='calendar') ui.sel = TODAY; else if(ui.tab==='week') ui.sel = ui.wk<=TODAY && TODAY<add(ui.wk,7) ? TODAY : ui.wk; ui.tab = lsGet('mp-daylayout')||'day2'; }
+    render(); window.scrollTo(0,0); }
   else if(a==='mon'){ let [y,m] = ui.ym; m += +t.dataset.dir; if(m<0){m=11;y--} if(m>11){m=0;y++} ui.ym = [y,m]; render(); }
   else if(a==='pick'){ const pm = markers(t.dataset.date); if(!S.plan.days[t.dataset.date] && !pm.thaw && !pm.shop) return; ui.sel = t.dataset.date; ui.tab = lsGet('mp-daylayout')||'day2'; render(); window.scrollTo(0,0); }
   else if(a==='daylayout'){ ui.tab = t.dataset.v; lsSet('mp-daylayout', ui.tab); render(); }
