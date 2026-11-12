@@ -284,7 +284,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-11m';
+const APP_VERSION = '2026-11-11n';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -837,8 +837,11 @@ function servingCard(d,k,label){
   const rows = G.list.flatMap(g => g.cooks || g.each || g.scoop ? [[g.name, p=>fmtPortion(g,p)]] : g.comps.map(c=>[FOODS[c[0]].n, p=>cg(c,p)>0?household(c[0],raw(d,p,c)):'—']));
   const off = all.filter(p=>!ppl.includes(p));
   const body = rows.map((r,i)=>`<tr><td>${esc(r[0])}</td>${all.map(p=>ppl.includes(p) ? `<td>${fmt(r[1](p))}</td>` : `<td class="muted">${why(p)}</td>`).join('')}</tr>`).join('');
-  const open = !!(ui.serveOpen||{})[d+'|'+k];
-  return `<div class="card serve" id="${sid}"><div class="eyebrow">${label}${off.length?'':''}</div><h3 style="margin:2px 0 4px">${esc(G.meal.n)}</h3>
+  const open = !!(ui.serveOpen||{})[d+'|'+k], shown = !!(ui.serveShow||{})[d+'|'+k];
+  // Collapsed by default: tap the header to show the table.
+  const headBtn = `<button class="slothead" style="padding:2px 0;border-top:0" data-act="serveshow" data-k="${d}|${k}" aria-expanded="${shown}"><span class="grow1"><span class="eyebrow">${label}</span><br><b style="font-size:19px">${esc(G.meal.n)}</b><br><span class="small muted">${ppl.map(p=>NAMES[p]).join(', ')}</span></span><span class="chev" style="${shown?'transform:rotate(90deg)':''}">›</span></button>`;
+  if(!shown) return `<div class="card serve" id="${sid}">${headBtn}</div>`;
+  return `<div class="card serve" id="${sid}">${headBtn}
     <table><thead><tr><th></th>${all.map(p=>`<th style="color:${PC[p]}">${NAMES[p]}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table>
     <button class="slothead" style="border-top:1px solid var(--line);margin-top:6px" data-act="serveopen" data-k="${d}|${k}" aria-expanded="${open}"><span class="grow1"><b style="font-size:15px">Instructions & recipe</b></span><span class="chev" style="${open?'transform:rotate(90deg)':''}">›</span></button>
     ${open ? mealCard(d,k,null,{bare:true}) : ''}</div>`;
@@ -1255,9 +1258,10 @@ document.addEventListener('click', e=>{
   else if(a==='daylayout'){ ui.tab = t.dataset.v; lsSet('mp-daylayout', ui.tab); render(); }
   else if(a==='wnav'){ ui.wk = add(ui.wk, +t.dataset.dir); render(); slideIn(Math.sign(+t.dataset.dir)); }
   else if(a==='wkday'){ ui.sel = t.dataset.date; ui.tab = lsGet('mp-daylayout')||'day2'; render(); window.scrollTo(0,0); }
-  else if(a==='wkmeal'){ const d = t.dataset.date, k = t.dataset.k; ui.sel = d; ui.tab = lsGet('mp-daylayout')||'day2'; ui.mealOpen[d+'|'+k] = true; ui.slotOpen = ui.slotOpen||{}; ['K','Y'].forEach(p=>{ ui.mealOpen[d+'|'+k+'|'+p] = true; ui.slotOpen[d+'|'+p+'|'+(k==='l'?'Lunch':'Dinner')] = true; }); render();
+  else if(a==='wkmeal'){ const d = t.dataset.date, k = t.dataset.k; ui.sel = d; ui.tab = lsGet('mp-daylayout')||'day2'; ui.mealOpen[d+'|'+k] = true; ui.slotOpen = ui.slotOpen||{}; (ui.serveShow = ui.serveShow||{})[d+'|'+k] = true; ['K','Y'].forEach(p=>{ ui.mealOpen[d+'|'+k+'|'+p] = true; ui.slotOpen[d+'|'+p+'|'+(k==='l'?'Lunch':'Dinner')] = true; }); render();
     const p = ['K','Y'].filter(shows).find(x=>eaters(d,k).includes(x)), el = document.getElementById(ui.tab==='day2' && S.view.mode==='both' ? 'sv-'+(d+'|'+k).replace(/[^a-z0-9]/gi,'_') : 'm-'+(ui.tab==='day' ? d+'|'+k : d+'|'+k+'|'+p).replace(/[^a-z0-9]/gi,'_'));
     if(el){ const hd = document.querySelector('header.top'); window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - (hd?hd.offsetHeight:0) - 50); } else window.scrollTo(0,0); }
+  else if(a==='serveshow'){ ui.serveShow = ui.serveShow||{}; ui.serveShow[t.dataset.k] = !ui.serveShow[t.dataset.k]; const sc = window.scrollY; render(); window.scrollTo(0,sc); }
   else if(a==='serveopen'){ ui.serveOpen = ui.serveOpen||{}; ui.serveOpen[t.dataset.k] = !ui.serveOpen[t.dataset.k]; const sc = window.scrollY; render(); window.scrollTo(0,sc); }
   else if(a==='slotopen'){ ui.slotOpen = ui.slotOpen||{}; ui.slotOpen[t.dataset.k] = !ui.slotOpen[t.dataset.k]; const sc = window.scrollY; render(); window.scrollTo(0,sc); }
   else if(a==='macshow'){ ui.macShow = !ui.macShow; const sc = window.scrollY; render(); window.scrollTo(0,sc); }
