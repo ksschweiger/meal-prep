@@ -283,7 +283,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-11d';
+const APP_VERSION = '2026-11-11e';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -1196,6 +1196,9 @@ function swap(date,key){
   toast(`Swapped to ${MEALS[next].n}. Other portions adjusted to stay near targets.`);
 }
 
+// Slide the new week/day in from the side it came from (dir 1 = next, -1 = previous).
+function slideIn(dir){ const el = document.querySelector('#view .view'); if(!el || !el.animate || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  el.animate([{transform:`translateX(${dir*70}px)`, opacity:0.15},{transform:'none', opacity:1}], {duration:230, easing:'cubic-bezier(.2,.8,.2,1)'}); }
 // Swipe left/right on the Week and day pages to go to the next/previous week or day.
 (()=>{ let sx = null, sy = 0, st = 0;
   document.addEventListener('touchstart', e=>{ const t = e.touches[0];
@@ -1206,8 +1209,8 @@ function swap(date,key){
   const end = (x,y)=>{ if(sx==null) return; const dx = x - sx, dy = y - sy; sx = null;
     if(Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx)*0.6 || Date.now()-st > 800) return;
     const dir = dx < 0 ? 1 : -1;
-    if(ui.tab==='week'){ ui.wk = add(ui.wk || monOf(TODAY), dir*7); render(); window.scrollTo(0,0); }
-    else { const n = add(ui.sel, dir); if(S.plan.days[n] || markers(n).thaw || markers(n).shop){ ui.sel = n; render(); window.scrollTo(0,0); } } };
+    if(ui.tab==='week'){ ui.wk = add(ui.wk || monOf(TODAY), dir*7); render(); window.scrollTo(0,0); slideIn(dir); }
+    else { const n = add(ui.sel, dir); if(S.plan.days[n] || markers(n).thaw || markers(n).shop){ ui.sel = n; render(); window.scrollTo(0,0); slideIn(dir); } } };
   document.addEventListener('touchend', e=>{ const t = e.changedTouches[0]; end(t.clientX, t.clientY); }, {passive:true});
   // Some phones cancel the touch once they start scrolling; use the last position seen.
   document.addEventListener('touchcancel', ()=>end(lx, ly), {passive:true});
@@ -1221,13 +1224,13 @@ document.addEventListener('click', e=>{
   else if(a==='mon'){ let [y,m] = ui.ym; m += +t.dataset.dir; if(m<0){m=11;y--} if(m>11){m=0;y++} ui.ym = [y,m]; render(); }
   else if(a==='pick'){ const pm = markers(t.dataset.date); if(!S.plan.days[t.dataset.date] && !pm.thaw && !pm.shop) return; ui.sel = t.dataset.date; ui.tab = lsGet('mp-daylayout')||'day2'; render(); window.scrollTo(0,0); }
   else if(a==='daylayout'){ ui.tab = t.dataset.v; lsSet('mp-daylayout', ui.tab); render(); }
-  else if(a==='wnav'){ ui.wk = add(ui.wk, +t.dataset.dir); render(); }
+  else if(a==='wnav'){ ui.wk = add(ui.wk, +t.dataset.dir); render(); slideIn(Math.sign(+t.dataset.dir)); }
   else if(a==='wkday'){ ui.sel = t.dataset.date; ui.tab = lsGet('mp-daylayout')||'day2'; render(); window.scrollTo(0,0); }
   else if(a==='wkmeal'){ const d = t.dataset.date, k = t.dataset.k; ui.sel = d; ui.tab = lsGet('mp-daylayout')||'day2'; ui.mealOpen[d+'|'+k] = true; ['K','Y'].forEach(p=>{ ui.mealOpen[d+'|'+k+'|'+p] = true; }); render();
     const p = ['K','Y'].filter(shows).find(x=>eaters(d,k).includes(x)), el = document.getElementById('m-'+(ui.tab==='day' ? d+'|'+k : d+'|'+k+'|'+p).replace(/[^a-z0-9]/gi,'_'));
     if(el){ const hd = document.querySelector('header.top'); window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - (hd?hd.offsetHeight:0) - 50); } else window.scrollTo(0,0); }
   else if(a==='macshow'){ ui.macShow = !ui.macShow; const sc = window.scrollY; render(); window.scrollTo(0,sc); }
-  else if(a==='dnav'){ const n = add(ui.sel, +t.dataset.dir); if(S.plan.days[n]){ ui.sel = n; render(); } }
+  else if(a==='dnav'){ const n = add(ui.sel, +t.dataset.dir); if(S.plan.days[n]){ ui.sel = n; render(); slideIn(+t.dataset.dir); } }
   else if(a==='trip'){ ui.trip = +t.dataset.i; render(); }
   else if(a==='gnav'){ ui.gc = Math.max(0, Math.min(shopWeeks().length-1, ui.gc + +t.dataset.dir)); render(); }
   else if(a==='season'){ lsSet('mp-season', t.dataset.v==='off'?'off':null); applyTheme(); render(); }
