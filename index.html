@@ -283,7 +283,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-11e';
+const APP_VERSION = '2026-11-11f';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -554,6 +554,10 @@ function isDrinkNight(d){
 }
 const weekOf = date => shopWeeks().find(w=>date>=w.start && date<=w.end);
 const isLocked = date => { const w = weekOf(date); return !!(w && (S.locked||{})[w.start]); };
+// Ratings are per person: ratings[id] = {K:1, Y:-1}. An old single number (who unknown) is kept under "?".
+const votesOf = id => { const x = (S.ratings||{})[id]; return x && typeof x==='object' ? x : (x ? {'?':x} : {}); };
+const myVote = id => votesOf(id)[S.view.me] || 0;
+const votersWith = (id,v) => Object.keys(votesOf(id)).filter(p=>votesOf(id)[p]===v).map(p=>p==='?'?'someone':NAMES[p]);
 const isCarry = (date,key) => (((S.plan.days[date]||{}).carry)||[]).includes(key);
 const isSkipped = (date,key) => !!(S.skipped||{})[date+'|'+key];
 function pushBack(w){
@@ -722,10 +726,10 @@ const SRC_NAMES = {'spendwithpennies.com':'Spend With Pennies'};
 function srcName(u){ try { const h = new URL(u).hostname.replace(/^www\./,''); return 'the original recipe on '+(SRC_NAMES[h]||h); } catch(e){ return 'the original recipe'; } }
 
 function mealCard(date,key,only){
-  const G = groups(date,key), m = G.meal, persons = KEY_PERSONS[key], fam = key==='d', r = S.ratings[G.id]||0;
+  const G = groups(date,key), m = G.meal, persons = KEY_PERSONS[key], fam = key==='d', r = myVote(G.id);
   const run = G.run, idx = run.indexOf(date), cyc = S.plan.cycles[cycleOf(run[0])];
   const who = fam ? `<div class="who" style="--pc:var(--accent)">Family dinner</div>` : key==='l' ? `<div class="who" style="--pc:var(--accent)">Shared lunch · Kaleb & Kayla</div>` : key==='c' ? `<div class="who" style="--pc:var(--accent)">Both of you · every morning</div>` : `<div class="who" style="--pc:${PC[persons[0]]}"><span class="pdot"></span>${NAMES[persons[0]]}</div>`;
-  const tags = (m.style?`<span class="tag style" style="--sc:${STYLE_COLOR[m.style]}">${m.style}</span>`:'')+`<span class="tag">${m.tool}</span>`+(run.length>1&&key!=='c'?`<span class="tag">Day ${idx+1} of ${run.length}</span>`:'');
+  const tags = (m.style?`<span class="tag style" style="--sc:${STYLE_COLOR[m.style]}">${m.style}</span>`:'')+`<span class="tag">${m.tool}</span>`+(run.length>1&&key!=='c'?`<span class="tag">Day ${idx+1} of ${run.length}</span>`:'')+[[1,'👍'],[-1,'👎']].map(([v,e])=>{ const w = Object.keys(votesOf(G.id)).filter(p=>p!==S.view.me && votesOf(G.id)[p]===v).map(p=>p==='?'?'someone':NAMES[p]); return w.length?`<span class="tag">${e} ${esc(w.join(', '))}</span>`:''; }).join('');
   // only = a person's section on the new day page: show just their portion (Kayla's dinner also shows Landen's).
   const vis = only ? eaters(date,key).filter(x=>x===only || (only==='Y' && x==='L')) : eaters(date,key).filter(shows);
   const tape = (p,txt) => `<span class="tape" style="--pc:${PC[p]}"><b title="${NAMES[p]}">${TAPE_LETTER[p]||p}</b>${txt}</span>`;
@@ -875,8 +879,8 @@ function statsCard(){
         ${tile('Receipts vs. estimate', drift==null?'—':(drift>=0?'+':'−')+money(Math.abs(drift)), drift==null?'add receipt photos':'average per order')}
       </div>`;
   }
-  const liked = Object.keys(S.ratings||{}).filter(id=>S.ratings[id]>0 && MEALS[id]), nope = Object.keys(S.ratings||{}).filter(id=>S.ratings[id]<0 && MEALS[id]);
-  const meals = liked.length||nope.length ? `<div style="background:var(--sunk);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:8px"><div class="small muted">Meals you rated</div>${liked.length?`<div class="small" style="margin:4px 0">👍 ${liked.map(id=>esc(MEALS[id].n)).join(', ')}</div>`:''}${nope.length?`<div class="small" style="margin:4px 0">👎 ${nope.map(id=>esc(MEALS[id].n)).join(', ')}</div>`:''}</div>` : '';
+  const liked = Object.keys(S.ratings||{}).filter(id=>votersWith(id,1).length && MEALS[id]), nope = Object.keys(S.ratings||{}).filter(id=>votersWith(id,-1).length && MEALS[id]);
+  const meals = liked.length||nope.length ? `<div style="background:var(--sunk);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:8px"><div class="small muted">Meals you rated</div>${liked.length?`<div class="small" style="margin:4px 0">👍 ${liked.map(id=>esc(MEALS[id].n)+' <span class="muted">('+esc(votersWith(id,1).join(', '))+')</span>').join(', ')}</div>`:''}${nope.length?`<div class="small" style="margin:4px 0">👎 ${nope.map(id=>esc(MEALS[id].n)+' <span class="muted">('+esc(votersWith(id,-1).join(', '))+')</span>').join(', ')}</div>`:''}</div>` : '';
   return `<h2 style="font-size:22px">Stats</h2><div class="card">${body}</div>${meals}`;
 }
 const vStats = () => statsCard();
@@ -1186,7 +1190,7 @@ function autoMacros(p){
 function swap(date,key){
   const day = S.plan.days[date], slot = KEY_SLOT[key], cur = day[key];
   const w = isLocked(date) ? weekOf(date) : null, bought = w ? needsRange(w.start, w.end, true).need : null;
-  const cands = Object.keys(MEALS).filter(id=>MEALS[id].slot===slot && (!MEALS[id].for || MEALS[id].for===KEY_PERSONS[key][0]) && id!==cur && S.ratings[id]!==-1 && (!bought || MEALS[id].comps.every(c=>bought[c[0]] || FOODS[c[0]].pantry))).sort((a,b)=>(S.ratings[b]||0)-(S.ratings[a]||0));
+  const cands = Object.keys(MEALS).filter(id=>MEALS[id].slot===slot && (!MEALS[id].for || MEALS[id].for===KEY_PERSONS[key][0]) && id!==cur && !votersWith(id,-1).length && (!bought || MEALS[id].comps.every(c=>bought[c[0]] || FOODS[c[0]].pantry))).sort((a,b)=>(S.ratings[b]||0)-(S.ratings[a]||0));
   if(!cands.length && w){ toast('This week is locked and nothing else uses what you bought. Send a request for next week instead.'); return; }
   if(!cands.length){ toast('No other options yet. Send a request and Claude will add more.'); return; }
   const i = (S.ptr[key]||0) % cands.length; S.ptr[key] = (S.ptr[key]||0)+1;
@@ -1238,8 +1242,9 @@ document.addEventListener('click', e=>{
   else if(a==='weekend'){ S.settings.weekend = t.dataset.v; changed('Settings'); render(); }
   else if(a==='shopday'){ const i = +t.dataset.i, cur = shopDaysOf().slice(); const nx = cur.includes(i) ? cur.filter(x=>x!==i) : cur.concat(i).sort(); if(!nx.length) return; S.settings.shopDays = nx; S.settings.shopDay = nx[0]; ui.gc = null; changed('Settings'); render(); toast(`Shopping days: ${nx.map(x=>DOW[x]).join(' and ')}. Each trip covers the meals cooked before the next one.`); }
   else if(a==='goList'){ ui.trip = +t.dataset.ti; ui.tab = 'groceries'; render(); window.scrollTo(0,0); }
-  else if(a==='rate'){ const id = t.dataset.id, v = +t.dataset.v; S.ratings[id] = S.ratings[id]===v ? 0 : v; changed('Ratings'); render();
-    if(S.ratings[id]===1) toast(`Liked. ${MEALS[id].n} will come back more often.`); else if(S.ratings[id]===-1) toast('Noted. Claude will plan this less. Tap swap to replace it now.'); }
+  else if(a==='rate'){ const id = t.dataset.id, v = +t.dataset.v, o = Object.assign({}, votesOf(id)), me = S.view.me;
+    o[me] = o[me]===v ? 0 : v; if(!o[me]) delete o[me]; if(Object.keys(o).length) S.ratings[id] = o; else delete S.ratings[id]; changed('Ratings'); render();
+    if(o[me]===1) toast(`Liked. ${MEALS[id].n} will come back more often.`); else if(o[me]===-1) toast('Noted. Claude will plan this less. Tap swap to replace it now.'); }
   else if(a==='lock'){ const adds = pantryBuys(+t.dataset.ci); const prev = {}; adds.forEach(x=>{ const st = S.spices.find(z=>z.id===x.id); const r = st && st.rows.find(z=>z.size>0); if(!r) return; const cur = (r.left===null?.5:r.left)*r.size; prev[r.row] = r.left; r.left = Math.max(0, Math.round((cur + x.oz - x.used)/r.size*100)/100); }); rebuildSpices(); S.lockAdds = S.lockAdds||{}; S.lockAdds[t.dataset.s] = prev; S.locked = S.locked||{}; S.locked[t.dataset.s] = true; changed('Shopping'); render(); toast(adds.some(x=>x.oz)?`Shopping complete. Pantry updated with what you bought and what this week uses.`:'Shopping complete. This week is locked.'); }
   else if(a==='unlock'){ Object.entries((S.lockAdds||{})[t.dataset.s]||{}).forEach(([row,v])=>{ const r = PANTRY.find(z=>z.row==row); if(r) r.left = v; }); rebuildSpices(); delete (S.lockAdds||{})[t.dataset.s]; delete S.locked[t.dataset.s]; changed('Shopping'); render(); }
   else if(a==='pull'){ const w = shopWeeks()[+t.dataset.i]; pullForward(w); ui.gc = +t.dataset.i; changed('Calendar'); render(); toast(`Shopping moved to ${nice(add(w.start,-1))}. The week's meals shifted a day earlier.`); }
