@@ -112,8 +112,8 @@ main{padding-block:14px 110px}
 .wk{padding:4px 6px}.wk table{width:100%;border-collapse:collapse;table-layout:fixed}.wk thead th{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);text-align:left;padding:6px 6px}.wk thead th:first-child{width:62px}
 .wk td,.wk tbody th{border-top:1px solid var(--line);padding:4px;vertical-align:top}.wk tr.today{background:var(--sunk)}
 .wkmeal,.wkday{display:flex;flex-direction:column;align-items:flex-start;gap:1px;width:100%;text-align:left;background:none;border:0;padding:4px 2px;line-height:1.25;color:inherit;font:inherit}.wkmeal b{font-size:14px}.wkday .badges{display:flex;gap:2px;margin-top:2px}.wk td.muted{padding:8px 6px;font-size:14px}
-.serve{padding:10px 12px;margin-top:8px}.serve table{width:100%;border-collapse:collapse;margin-top:4px}.serve th{font-size:13px;text-align:left;padding:4px 4px}.serve td{border-top:1px solid var(--line);padding:6px 4px;font-size:14px;vertical-align:top}.serve td:first-child{font-weight:600;width:34%}
-.slot.psec{margin-top:16px;gap:6px}.psec .slothead{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--line);padding:10px 4px;color:inherit;font:inherit;line-height:1.3}.psec .slothead .grow1{flex:1}.psec .slothead b{font-family:var(--display);font-size:17px}.psec .slotbody{display:flex;flex-direction:column;gap:8px;padding-bottom:6px}.slot.psec > .eyebrow{font-family:inherit;font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:0 2px;border:0;margin-top:6px!important}.psec>.pname{display:flex;align-items:center;gap:8px;font-size:20px;border-bottom:2px solid var(--pc);padding-bottom:4px}.psec>.pname .pdot{background:var(--pc);width:12px;height:12px}
+.serve{padding:10px 12px;margin-top:8px}.serve table{width:100%;border-collapse:collapse;margin-top:4px}.serve th{font-size:13px;text-align:left;padding:4px 4px}.serve td{border-top:1px solid var(--line);padding:6px 4px;font-size:14px;vertical-align:top}.serve td:first-child{font-weight:600;width:34%}.serve td.off{color:var(--muted);text-align:center;vertical-align:middle;font-style:italic}.serve .meal{margin-top:6px;box-shadow:none}
+.slot.psec{margin-top:16px;gap:6px}.psec .slothead,.serve .slothead{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--line);padding:10px 4px;color:inherit;font:inherit;line-height:1.3}.psec .slothead .grow1,.serve .slothead .grow1{flex:1}.psec .slothead b{font-family:var(--display);font-size:17px}.psec .slotbody{display:flex;flex-direction:column;gap:8px;padding-bottom:6px}.slot.psec > .eyebrow{font-family:inherit;font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:0 2px;border:0;margin-top:6px!important}.psec>.pname{display:flex;align-items:center;gap:8px;font-size:20px;border-bottom:2px solid var(--pc);padding-bottom:4px}.psec>.pname .pdot{background:var(--pc);width:12px;height:12px}
 .dayhead h2{font-size:22px;flex:1;text-align:center}
 .banner{display:flex;gap:10px;align-items:flex-start;border-radius:10px;padding:10px 12px;font-size:14px}
 .banner svg{width:18px;height:18px;flex:none;margin-top:1px}
@@ -284,7 +284,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-11k';
+const APP_VERSION = '2026-11-11l';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -726,7 +726,8 @@ function personSummary(date,p){
 const SRC_NAMES = {'spendwithpennies.com':'Spend With Pennies'};
 function srcName(u){ try { const h = new URL(u).hostname.replace(/^www\./,''); return 'the original recipe on '+(SRC_NAMES[h]||h); } catch(e){ return 'the original recipe'; } }
 
-function mealCard(date,key,only){
+function mealCard(date,key,only,opts){
+  opts = opts||{};
   const G = groups(date,key), m = G.meal, persons = KEY_PERSONS[key], fam = key==='d', r = myVote(G.id);
   const run = G.run, idx = run.indexOf(date), cyc = S.plan.cycles[cycleOf(run[0])];
   const who = fam ? `<div class="who" style="--pc:var(--accent)">Family dinner</div>` : key==='l' ? `<div class="who" style="--pc:var(--accent)">Shared lunch · Kaleb & Kayla</div>` : key==='c' ? `<div class="who" style="--pc:var(--accent)">Both of you · every morning</div>` : `<div class="who" style="--pc:${PC[persons[0]]}"><span class="pdot"></span>${NAMES[persons[0]]}</div>`;
@@ -754,7 +755,7 @@ function mealCard(date,key,only){
   }).join('');
   const tareTip = G.list.some(g=>g.cooks) ? `<div class="tare"><b>Before you start:</b> weigh each empty pot, pan or container you'll store the cooked food in and write it down, so you can subtract it when you weigh the finished batch.</div>` : '';
   const okey = date+'|'+key+(only?'|'+only:''), aid = 'm-'+okey.replace(/[^a-z0-9]/gi,'_');
-  if(!ui.mealOpen[okey] && !isSkipped(date,key)){
+  if(!opts.bare && !ui.mealOpen[okey] && !isSkipped(date,key)){
     const whoTxt = fam ? 'Family dinner' : key==='l' ? 'Shared lunch' : key==='c' ? 'Every morning' : NAMES[persons[0]];
     const dotc = fam||key==='l'||key==='c' ? 'var(--accent)' : PC[persons[0]];
     const cookToday = key!=='c' && persons.length>1 && date===cyc.start && run[0]===cyc.start;
@@ -769,7 +770,7 @@ function mealCard(date,key,only){
         <button class="iconbtn" data-act="swap" data-date="${date}" data-key="${key}" aria-label="Swap meal">${I.swap}</button>
       </div></div>
     ${isLocked(date)?`<div><button class="btn" style="padding:6px 12px;font-size:13.5px" data-act="skip" data-date="${date}" data-key="${key}">Skip this meal</button></div>`:''}
-    <div class="grp">${rows}</div>${cookedNote}
+    ${opts.bare?'':`<div class="grp">${rows}</div>`}${cookedNote}
     ${key!=='c' && persons.length>1 && date===run[0] && !isCarry(date,key) ? `<div class="cookhelp"><div class="eyebrow" style="color:var(--ink)">${date===cyc.start?'Cooking today':'Cook on '+nice(cyc.start)+' (prep day)'} · whole batch for ${key==='d'?'the family':'both of you'}${live.length>1?`, ${live.length} days`:''}</div>${tareTip}<div class="tblwrap"><table class="ing" style="margin:0">${ing}</table></div></div>` : ''}
     <details class="more"><summary>Recipe${G.list.some(g=>g.cooks)?' & cooked weights':''}</summary>
       ${tareTip?`<div style="margin-top:10px">${tareTip}</div>`:''}
@@ -826,12 +827,21 @@ function vWeek(){
 // ---------- New day page: a section per person with all their meals ----------
 const SECTIONS = {K:[['Breakfast',['c','kb']],['Lunch',['l']],['Dinner',['d']],['Snack',['ks']]], Y:[['Breakfast',['c','yb']],['Lunch',['l']],['Dinner',['d']],['Snack',['ys']]]};
 // Serving table for a shared meal: one row per part of the meal, one column per person eating it.
+// "Both of us" view: one table per shared meal (everyone's column, even when someone isn't eating it), with the recipe one tap away.
 function servingCard(d,k,label){
-  if(isFlex(d,k) || isSkipped(d,k)) return '';
-  const ppl = eaters(d,k); if(ppl.length<2) return '';
-  const G = groups(d,k), cell = (g,p) => g.cooks || g.each || g.scoop ? fmtPortion(g,p) : g.comps.filter(c=>cg(c,p)>0).map(c=>household(c[0],raw(d,p,c))).join(' + ') || '—';
-  const rows = G.list.flatMap(g => g.cooks || g.each || g.scoop ? [[g.name, ppl.map(p=>cell(g,p))]] : g.comps.map(c=>[FOODS[c[0]].n, ppl.map(p=>cg(c,p)>0?household(c[0],raw(d,p,c)):'—')]));
-  return `<div class="card serve"><div class="eyebrow">${label} · ${esc(G.meal.n)}</div><table><thead><tr><th></th>${ppl.map(p=>`<th style="color:${PC[p]}">${NAMES[p]}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r[0])}</td>${r[1].map(v=>`<td>${String(v).replace(/^about /,'').replace(/ \(([^)]+)\)/,'<br><span class="small muted">$1</span>')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  const day = S.plan.days[d], all = KEY_PERSONS[k], ppl = eaters(d,k), sid = 'sv-'+(d+'|'+k).replace(/[^a-z0-9]/gi,'_');
+  const m = MEALS[day[k]], whole = isFlex(d,k) || isSkipped(d,k) || !ppl.length || !m;
+  const why = p => isAway(d,p) ? 'Away' : isFlex(d,k) ? 'Flex' : isSkipped(d,k) ? 'Skipped' : 'Out';
+  if(whole) return `<div class="card serve" id="${sid}"><div class="eyebrow">${label}</div><div class="muted" style="padding:6px 0 2px">${isSkipped(d,k)?'Skipped':isFlex(d,k)?'Flex. Eat leftovers from the week first.':'Nobody home for this one.'}</div></div>`;
+  const G = groups(d,k), fmt = v => String(v).replace(/^about /,'').replace(/ \(([^)]+)\)/,'<br><span class="small muted">$1</span>');
+  const rows = G.list.flatMap(g => g.cooks || g.each || g.scoop ? [[g.name, p=>fmtPortion(g,p)]] : g.comps.map(c=>[FOODS[c[0]].n, p=>cg(c,p)>0?household(c[0],raw(d,p,c)):'—']));
+  const off = all.filter(p=>!ppl.includes(p));
+  const body = rows.map((r,i)=>`<tr><td>${esc(r[0])}</td>${all.map(p=>ppl.includes(p) ? `<td>${fmt(r[1](p))}</td>` : i===0 ? `<td class="off" rowspan="${rows.length}">${why(p)}</td>` : '').join('')}</tr>`).join('');
+  const open = !!(ui.serveOpen||{})[d+'|'+k];
+  return `<div class="card serve" id="${sid}"><div class="eyebrow">${label}${off.length?'':''}</div><h3 style="margin:2px 0 4px">${esc(G.meal.n)}</h3>
+    <table><thead><tr><th></th>${all.map(p=>`<th style="color:${PC[p]}">${NAMES[p]}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table>
+    <button class="slothead" style="border-top:1px solid var(--line);margin-top:6px" data-act="serveopen" data-k="${d}|${k}" aria-expanded="${open}"><span class="grow1"><b style="font-size:15px">Instructions & recipe</b></span><span class="chev" style="${open?'transform:rotate(90deg)':''}">›</span></button>
+    ${open ? mealCard(d,k,null,{bare:true}) : ''}</div>`;
 }
 function vDay2(){
   const d = ui.sel, day = S.plan.days[d];
@@ -857,8 +867,9 @@ function vDay2(){
       const names = keys.filter(k=>KEY_PERSONS[k].includes(p) && (['l','d','kb','yb'].includes(k) || (day[k] && day[k]!=='none' && !isFlex(d,k)))).map(k=>!eaters(d,k).includes(p) ? (isFlex(d,k)?'Flex':'Out') : isFlex(d,k) ? 'Flex' : (MEALS[day[k]].s||MEALS[day[k]].n)).join(' · ');
       return `<button class="slothead" data-act="slotopen" data-k="${esc(sk)}" aria-expanded="${open}"><span class="grow1"><b>${label}</b><br><span class="small muted">${esc(names)}</span></span><span class="chev" style="${open?'transform:rotate(90deg)':''}">›</span></button>${open?`<div class="slotbody">${items}</div>`:''}`; }).join('');
     return `<section class="slot psec" style="--pc:${PC[p]}"><h2 class="pname"><span class="pdot"></span>${NAMES[p]}</h2>${parts}</section>`; };
-  const serve = S.view.mode==='both' ? servingCard(d,'l','Lunch') + servingCard(d,'d','Dinner') : '';
-  return head + seg + lockb + wk + banners + mac + (serve ? `<div class="eyebrow" style="margin-top:14px">Serving</div>${serve}` : '') + ppl.map(section).join('');
+  // Both of us: just the shared meals as serving tables. Just me: my own section.
+  if(S.view.mode==='both') return head + seg + lockb + wk + banners + mac + servingCard(d,'l','Lunch') + servingCard(d,'d','Dinner');
+  return head + seg + lockb + wk + banners + mac + ppl.map(section).join('');
 }
 
 // ---------- Shopping stats (from shopLog, ratings and the plan) ----------
@@ -1245,8 +1256,9 @@ document.addEventListener('click', e=>{
   else if(a==='wnav'){ ui.wk = add(ui.wk, +t.dataset.dir); render(); slideIn(Math.sign(+t.dataset.dir)); }
   else if(a==='wkday'){ ui.sel = t.dataset.date; ui.tab = lsGet('mp-daylayout')||'day2'; render(); window.scrollTo(0,0); }
   else if(a==='wkmeal'){ const d = t.dataset.date, k = t.dataset.k; ui.sel = d; ui.tab = lsGet('mp-daylayout')||'day2'; ui.mealOpen[d+'|'+k] = true; ui.slotOpen = ui.slotOpen||{}; ['K','Y'].forEach(p=>{ ui.mealOpen[d+'|'+k+'|'+p] = true; ui.slotOpen[d+'|'+p+'|'+(k==='l'?'Lunch':'Dinner')] = true; }); render();
-    const p = ['K','Y'].filter(shows).find(x=>eaters(d,k).includes(x)), el = document.getElementById('m-'+(ui.tab==='day' ? d+'|'+k : d+'|'+k+'|'+p).replace(/[^a-z0-9]/gi,'_'));
+    const p = ['K','Y'].filter(shows).find(x=>eaters(d,k).includes(x)), el = document.getElementById(ui.tab==='day2' && S.view.mode==='both' ? 'sv-'+(d+'|'+k).replace(/[^a-z0-9]/gi,'_') : 'm-'+(ui.tab==='day' ? d+'|'+k : d+'|'+k+'|'+p).replace(/[^a-z0-9]/gi,'_'));
     if(el){ const hd = document.querySelector('header.top'); window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - (hd?hd.offsetHeight:0) - 50); } else window.scrollTo(0,0); }
+  else if(a==='serveopen'){ ui.serveOpen = ui.serveOpen||{}; ui.serveOpen[t.dataset.k] = !ui.serveOpen[t.dataset.k]; const sc = window.scrollY; render(); window.scrollTo(0,sc); }
   else if(a==='slotopen'){ ui.slotOpen = ui.slotOpen||{}; ui.slotOpen[t.dataset.k] = !ui.slotOpen[t.dataset.k]; const sc = window.scrollY; render(); window.scrollTo(0,sc); }
   else if(a==='macshow'){ ui.macShow = !ui.macShow; const sc = window.scrollY; render(); window.scrollTo(0,sc); }
   else if(a==='dnav'){ const n = add(ui.sel, +t.dataset.dir); if(S.plan.days[n]){ ui.sel = n; render(); slideIn(+t.dataset.dir); } }
