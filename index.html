@@ -283,7 +283,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-11f';
+const APP_VERSION = '2026-11-11g';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -790,7 +790,7 @@ function dayBanners(d){
 }
 function vDay(){
   const d = ui.sel, day = S.plan.days[d];
-  const head = `<div class="dayhead"><button class="iconbtn" data-act="dnav" data-dir="-1" aria-label="Previous day">${I.left}</button><h2>${nice(d)}</h2><button class="iconbtn" data-act="dnav" data-dir="1" aria-label="Next day">${I.right}</button></div><div class="seg" style="margin-top:6px"><button class="${ui.tab==='day'?'on':''}" data-act="daylayout" data-v="day">Classic day</button><button class="${ui.tab==='day2'?'on':''}" data-act="daylayout" data-v="day2">By person</button></div>`;
+  const head = `<div class="dayhead"><button class="iconbtn" data-act="dnav" data-dir="-1" aria-label="Previous day">${I.left}</button><h2>${nice(d)}</h2><button class="iconbtn" data-act="dnav" data-dir="1" aria-label="Next day">${I.right}</button></div><div style="text-align:center"><button class="linkbtn" data-act="daylayout" data-v="day2">Try the new day layout ›</button></div>`;
   let banners = dayBanners(d);
   if(!day) return head + banners + '<div class="card muted">No meals planned for this day.</div>';
   const flexCard = k => `<article class="meal" style="border-style:dashed"><div class="mtop"><div class="mtitle">${k==='d'||k==='l'?`<div class="who" style="--pc:var(--accent)">${k==='d'?'Family dinner':'Shared lunch'}</div>`:`<div class="who" style="--pc:${PC[KEY_PERSONS[k][0]]}"><span class="pdot"></span>${NAMES[KEY_PERSONS[k][0]]}</div>`}<h3>${k==='ys'?'Nothing planned':!eaters(d,k).length?'Away':S.plan.days[d].off?'Open':'Flex'}</h3><div class="note">${k==='ys'?'Snacks are off for now.':!eaters(d,k).length?`${NAMES[KEY_PERSONS[k][0]]} is away today. Nothing planned.`:S.plan.days[d].off?'Plan pushed back a day. Use leftovers or eat out.':'Eat leftovers from the week first, then whatever fits the day.'}</div></div></div></article>`;
@@ -826,7 +826,7 @@ function vWeek(){
 const SECTIONS = {K:[['Breakfast',['c','kb']],['Lunch',['l']],['Dinner',['d']],['Snack',['ks']]], Y:[['Breakfast',['c','yb']],['Lunch',['l']],['Dinner',['d']],['Snack',['ys']]]};
 function vDay2(){
   const d = ui.sel, day = S.plan.days[d];
-  const head = `<div class="dayhead"><button class="iconbtn" data-act="dnav" data-dir="-1" aria-label="Previous day">${I.left}</button><h2>${nice(d)}</h2><button class="iconbtn" data-act="dnav" data-dir="1" aria-label="Next day">${I.right}</button></div><div class="seg" style="margin-top:6px"><button class="${ui.tab==='day'?'on':''}" data-act="daylayout" data-v="day">Classic day</button><button class="${ui.tab==='day2'?'on':''}" data-act="daylayout" data-v="day2">By person</button></div>`;
+  const head = `<div class="dayhead"><button class="iconbtn" data-act="dnav" data-dir="-1" aria-label="Previous day">${I.left}</button><h2>${nice(d)}</h2><button class="iconbtn" data-act="dnav" data-dir="1" aria-label="Next day">${I.right}</button></div><div style="text-align:center"><button class="linkbtn" data-act="daylayout" data-v="day">Old day layout ›</button></div>`;
   const banners = dayBanners(d);
   if(!day) return head + banners + '<div class="card muted">No meals planned for this day.</div>';
   const seg = `<div class="seg"><button class="${S.view.mode==='mine'?'on':''}" data-act="vmode" data-v="mine">Just ${NAMES[S.view.me]}</button><button class="${S.view.mode==='both'?'on':''}" data-act="vmode" data-v="both">Both of us</button></div>`;
