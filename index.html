@@ -285,7 +285,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-11o';
+const APP_VERSION = '2026-11-11p';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -772,15 +772,13 @@ function mealCard(date,key,only,opts){
       </div></div>
     ${isLocked(date)?`<div><button class="btn" style="padding:6px 12px;font-size:13.5px" data-act="skip" data-date="${date}" data-key="${key}">Skip this meal</button></div>`:''}
     ${opts.bare?'':`<div class="grp">${rows}</div>`}${cookedNote}
-    ${key!=='c' && persons.length>1 && date===run[0] && !isCarry(date,key) ? `<div class="cookhelp"><div class="eyebrow" style="color:var(--ink)">${date===cyc.start?'Cooking today':'Cook on '+nice(cyc.start)+' (prep day)'} · whole batch for ${key==='d'?'the family':'both of you'}${live.length>1?`, ${live.length} days`:''}</div>${tareTip}<div class="tblwrap"><table class="ing" style="margin:0">${ing}</table></div></div>` : ''}
-    <details class="more"><summary>Recipe${G.list.some(g=>g.cooks)?' & cooked weights':''}</summary>
-      ${tareTip?`<div style="margin-top:10px">${tareTip}</div>`:''}
-      ${help?`<div class="cookhelp">${help}</div>`:''}
-      <div class="tblwrap"><table class="ing"><tr><td class="muted small">Ingredients${live.length>1?` (${live.length} days)`:''}</td><td class="n muted small">About</td></tr>${ing}</table></div>
-      <div class="eyebrow" style="margin-top:12px">Method · amounts are for the whole batch</div><ol class="steps">${m.steps.map(s=>`<li>${stepTxt(s)}</li>`).join('')}</ol>
-      ${m.src?`<p class="note" style="margin:10px 0 0">Based on <a href="${esc(m.src)}" target="_blank" rel="noopener">${esc(srcName(m.src))}</a>, with amounts rescaled for your macros.</p>`:''}
-      ${fam?`<div style="margin-top:10px"><button class="btn" data-act="openMove" data-date="${date}">${'Move this dinner'}</button></div>`:''}
-    </details>
+    ${(()=>{ const cookDay = key!=='c' && persons.length>1 && date===run[0] && !isCarry(date,key);
+      const batch = `${cookDay ? (date===cyc.start?'Cooking today':'Cook on '+nice(cyc.start)) : 'Cooked '+nice(cyc.start)} · whole batch${key==='d'?' for the family':persons.length>1?' for both of you':''}${live.length>1?`, ${live.length} days`:''}`;
+      const dk = date+'|'+key, op = n => (ui.secOpen||{})[dk+'|'+n] ? 'open' : '';
+      const sec = (n,title,body) => `<details class="more" ${op(n)}><summary data-act="secopen" data-k="${esc(dk+'|'+n)}">${title}</summary>${body}</details>`;
+      return sec('ing','Ingredients', `<div class="eyebrow" style="margin-top:10px">${batch}</div><div class="tblwrap"><table class="ing" style="margin-top:4px">${ing}</table></div>`)
+        + sec('steps','Instructions', `<ol class="steps">${m.steps.map(s=>`<li>${stepTxt(s)}</li>`).join('')}</ol>${m.src?`<p class="note" style="margin:10px 0 0">Based on <a href="${esc(m.src)}" target="_blank" rel="noopener">${esc(srcName(m.src))}</a>, with amounts rescaled for your macros.</p>`:''}${fam?`<div style="margin-top:10px"><button class="btn" data-act="openMove" data-date="${date}">Move this dinner</button></div>`:''}`)
+        + (help ? sec('cw','Cooked weight', `<div style="margin-top:10px">${tareTip}</div><div class="cookhelp">${help}</div>`) : ''); })()}
   </article>`;
 }
 
@@ -1271,6 +1269,7 @@ document.addEventListener('click', e=>{
   else if(a==='wkmeal'){ const d = t.dataset.date, k = t.dataset.k; ui.sel = d; ui.tab = lsGet('mp-daylayout')||'day2'; ui.mealOpen[d+'|'+k] = true; ui.slotOpen = ui.slotOpen||{}; (ui.serveShow = ui.serveShow||{})[d+'|'+k] = true; ['K','Y'].forEach(p=>{ ui.mealOpen[d+'|'+k+'|'+p] = true; ui.slotOpen[d+'|'+p+'|'+(k==='l'?'Lunch':'Dinner')] = true; }); render();
     const p = ['K','Y'].filter(shows).find(x=>eaters(d,k).includes(x)), el = document.getElementById(ui.tab==='day2' && S.view.mode==='both' ? 'sv-'+(d+'|'+k).replace(/[^a-z0-9]/gi,'_') : 'm-'+(ui.tab==='day' ? d+'|'+k : d+'|'+k+'|'+p).replace(/[^a-z0-9]/gi,'_'));
     if(el){ const hd = document.querySelector('header.top'); window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - (hd?hd.offsetHeight:0) - 50); } else window.scrollTo(0,0); }
+  else if(a==='secopen'){ e.preventDefault(); ui.secOpen = ui.secOpen||{}; ui.secOpen[t.dataset.k] = !ui.secOpen[t.dataset.k]; const sc = window.scrollY; render(); window.scrollTo(0,sc); }
   else if(a==='serveshow'){ ui.serveShow = ui.serveShow||{}; ui.serveShow[t.dataset.k] = !ui.serveShow[t.dataset.k]; const sc = window.scrollY; render(); window.scrollTo(0,sc); }
   else if(a==='serveopen'){ ui.serveOpen = ui.serveOpen||{}; ui.serveOpen[t.dataset.k] = !ui.serveOpen[t.dataset.k]; const sc = window.scrollY; render(); window.scrollTo(0,sc); }
   else if(a==='slotopen'){ ui.slotOpen = ui.slotOpen||{}; ui.slotOpen[t.dataset.k] = !ui.slotOpen[t.dataset.k]; const sc = window.scrollY; render(); window.scrollTo(0,sc); }
