@@ -285,7 +285,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-11p';
+const APP_VERSION = '2026-11-11q';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -763,6 +763,20 @@ function mealCard(date,key,only,opts){
     return `<button id="${aid}" class="mealrow" data-act="mopen" data-k="${okey}" aria-expanded="false"><span class="pdot" style="--pc:${dotc}"></span><span class="grow1"><span class="small muted">${whoTxt}${run.length>1&&key!=='c'?` · day ${idx+1} of ${run.length}`:''}${cookToday?' · <b style="color:var(--prep)">cook today</b>':''}</span><br><b>${esc(m.n)}</b></span>${r===1?`<span style="color:var(--accent)">${I.up.replace('<svg','<svg width="16" height="16"')}</span>`:''}<span class="chev">›</span></button>`;
   }
   if(isSkipped(date,key)) return `<article class="meal" style="opacity:.7;border-style:dashed"><div class="mtop"><div class="mtitle">${who}<h3 style="text-decoration:line-through">${esc(m.n)}</h3><div class="note">Skipped. Leftovers roll into next week's plan.</div></div><button class="btn" style="padding:6px 12px" data-act="skip" data-date="${date}" data-key="${key}">Undo</button></div></article>`;
+  const secs = (()=>{ const cookDay = key!=='c' && persons.length>1 && date===run[0] && !isCarry(date,key);
+      const batch = `${cookDay ? (date===cyc.start?'Cooking today':'Cook on '+nice(cyc.start)) : 'Cooked '+nice(cyc.start)} · whole batch${key==='d'?' for the family':persons.length>1?' for both of you':''}${live.length>1?`, ${live.length} days`:''}`;
+      const dk = date+'|'+key, op = n => (ui.secOpen||{})[dk+'|'+n] ? 'open' : '';
+      const sec = (n,title,body) => `<details class="more" ${op(n)}><summary data-act="secopen" data-k="${esc(dk+'|'+n)}">${title}</summary>${body}</details>`;
+      return sec('serve','Serving size', opts.serving || `<div class="grp" style="margin-top:8px">${rows}</div>${cookedNote}`)
+        + sec('ing','Ingredients', `<div class="eyebrow" style="margin-top:10px">${batch}</div><div class="tblwrap"><table class="ing" style="margin-top:4px">${ing}</table></div>`)
+        + sec('steps','Instructions', `<ol class="steps">${m.steps.map(s=>`<li>${stepTxt(s)}</li>`).join('')}</ol>${m.src?`<p class="note" style="margin:10px 0 0">Based on <a href="${esc(m.src)}" target="_blank" rel="noopener">${esc(srcName(m.src))}</a>, with amounts rescaled for your macros.</p>`:''}${fam?`<div style="margin-top:10px"><button class="btn" data-act="openMove" data-date="${date}">Move this dinner</button></div>`:''}`)
+        + (help ? sec('cw','Cooked weight', `<div style="margin-top:10px">${tareTip}</div><div class="cookhelp">${help}</div>`) : ''); })();
+  // Bare: inside a "Both of us" serving card, which already shows the meal name. Just the buttons and the four dropdowns.
+  if(opts.bare) return `<div class="row" style="justify-content:space-between;align-items:center;margin:4px 0 2px"><div class="tags">${tags}</div><div class="actions">
+        <button class="iconbtn ${r===1?'on-up':''}" data-act="rate" data-id="${G.id}" data-v="1" aria-label="Like" aria-pressed="${r===1}">${I.up}</button>
+        <button class="iconbtn ${r===-1?'on-down':''}" data-act="rate" data-id="${G.id}" data-v="-1" aria-label="Dislike" aria-pressed="${r===-1}">${I.down}</button>
+        <button class="iconbtn" data-act="swap" data-date="${date}" data-key="${key}" aria-label="Swap meal">${I.swap}</button>
+      </div></div>${secs}`;
   return `<article id="${aid}" class="meal ${fam?'family':''}">
     <div class="mtop"><div class="mtitle" data-act="mopen" data-k="${okey}" role="button" aria-expanded="true" style="cursor:pointer">${who}<h3>${esc(m.n)} <span class="chev" style="display:inline-block;transform:rotate(90deg)">›</span></h3><div class="tags">${tags}</div></div>
       <div class="actions">
@@ -771,14 +785,7 @@ function mealCard(date,key,only,opts){
         <button class="iconbtn" data-act="swap" data-date="${date}" data-key="${key}" aria-label="Swap meal">${I.swap}</button>
       </div></div>
     ${isLocked(date)?`<div><button class="btn" style="padding:6px 12px;font-size:13.5px" data-act="skip" data-date="${date}" data-key="${key}">Skip this meal</button></div>`:''}
-    ${opts.bare?'':`<div class="grp">${rows}</div>`}${cookedNote}
-    ${(()=>{ const cookDay = key!=='c' && persons.length>1 && date===run[0] && !isCarry(date,key);
-      const batch = `${cookDay ? (date===cyc.start?'Cooking today':'Cook on '+nice(cyc.start)) : 'Cooked '+nice(cyc.start)} · whole batch${key==='d'?' for the family':persons.length>1?' for both of you':''}${live.length>1?`, ${live.length} days`:''}`;
-      const dk = date+'|'+key, op = n => (ui.secOpen||{})[dk+'|'+n] ? 'open' : '';
-      const sec = (n,title,body) => `<details class="more" ${op(n)}><summary data-act="secopen" data-k="${esc(dk+'|'+n)}">${title}</summary>${body}</details>`;
-      return sec('ing','Ingredients', `<div class="eyebrow" style="margin-top:10px">${batch}</div><div class="tblwrap"><table class="ing" style="margin-top:4px">${ing}</table></div>`)
-        + sec('steps','Instructions', `<ol class="steps">${m.steps.map(s=>`<li>${stepTxt(s)}</li>`).join('')}</ol>${m.src?`<p class="note" style="margin:10px 0 0">Based on <a href="${esc(m.src)}" target="_blank" rel="noopener">${esc(srcName(m.src))}</a>, with amounts rescaled for your macros.</p>`:''}${fam?`<div style="margin-top:10px"><button class="btn" data-act="openMove" data-date="${date}">Move this dinner</button></div>`:''}`)
-        + (help ? sec('cw','Cooked weight', `<div style="margin-top:10px">${tareTip}</div><div class="cookhelp">${help}</div>`) : ''); })()}
+    ${secs}
   </article>`;
 }
 
@@ -841,9 +848,7 @@ function servingCard(d,k,label){
   const headBtn = `<button class="slothead" style="padding:2px 0;border-top:0" data-act="serveshow" data-k="${d}|${k}" aria-expanded="${shown}"><span class="grow1"><span class="eyebrow">${label}</span><br><b style="font-size:19px">${esc(G.meal.n)}</b><br><span class="small muted">${ppl.map(p=>NAMES[p]).join(', ')}</span></span><span class="chev" style="${shown?'transform:rotate(90deg)':''}">›</span></button>`;
   if(!shown) return `<div class="card serve" id="${sid}">${headBtn}</div>`;
   return `<div class="card serve" id="${sid}">${headBtn}
-    <table><thead><tr><th></th>${all.map(p=>`<th style="color:${PC[p]}">${NAMES[p]}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table>
-    <button class="slothead" style="border-top:1px solid var(--line);margin-top:6px" data-act="serveopen" data-k="${d}|${k}" aria-expanded="${open}"><span class="grow1"><b style="font-size:15px">Instructions & recipe</b></span><span class="chev" style="${open?'transform:rotate(90deg)':''}">›</span></button>
-    ${open ? mealCard(d,k,null,{bare:true}) : ''}</div>`;
+    ${mealCard(d,k,null,{bare:true, serving:`<table style="margin-top:8px"><thead><tr><th></th>${all.map(p=>`<th style="color:${PC[p]}">${NAMES[p]}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table>`})}</div>`;
 }
 function vDay2(){
   const d = ui.sel, day = S.plan.days[d];
