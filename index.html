@@ -286,7 +286,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-12a';
+const APP_VERSION = '2026-11-14a';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -796,10 +796,26 @@ function mealCard(date,key,only,opts){
   </article>`;
 }
 
+// Freezer pulls, spelled out: which package(s) (each Freezer row is one package), how much the recipe needs, and what to do with extra.
+const lbOz = g => { let oz = Math.round(g/28.35), lb = Math.floor(oz/16); oz -= lb*16; return (lb?lb+' lb':'') + (lb&&oz?' ':'') + (oz||!lb?oz+' oz':''); };
+function pickPackages(f, need){
+  const F = FOODS[f], pk = S.freezer.filter(x=>x.food===f && x.lb>0).map(x=>x.lb*453.6).sort((a,b)=>a-b);
+  if(F.thawEach){ const n = Math.max(1, Math.ceil(need/F.thawEach - .2)); return pk.slice().sort((a,b)=>Math.abs(a-need/n)-Math.abs(b-need/n)).slice(0,n); }
+  const one = pk.find(g=>g>=need); if(one) return [one];
+  const out = []; let tot = 0; pk.slice().reverse().forEach(g=>{ if(tot<need){ out.push(g); tot += g; } }); return out;
+}
+function thawDetail(t){
+  const F = FOODS[t.f], pk = pickPackages(t.f, t.need), pulled = pk.reduce((a,g)=>a+g,0), want = `${lbOz(t.need)} (${Math.round(t.need)} g)`;
+  if(F.thawEach){ const n = pk.length||1; return `<b>${esc(F.n)}:</b> ${n} ${n>1?F.thawUnit[1]:F.thawUnit[0]}${pk.length?' ('+pk.map(lbOz).join(', ')+')':''}. Cook ${n>1?'them':'it'} whole.`; }
+  if(!pk.length) return `<b>${esc(F.n)}:</b> ${want}.`;
+  const what = pk.length===1 ? `the ${lbOz(pk[0])} package` : `${pk.length} packages (${pk.map(lbOz).join(' + ')})`, extra = pulled - t.need;
+  return `<b>${esc(F.n)}:</b> pull ${what}. You need ${want}.` + (extra>=57 ? ` <span style="color:var(--bad)">${lbOz(extra)} extra: once thawed, weigh out ${Math.round(t.need)} g and put the rest back in the freezer.</span>`
+    : extra < -28 ? ` That's all you have; the other ${lbOz(-extra)} is on the grocery list.` : ' Use the whole package.');
+}
 function dayBanners(d){
   const mk = markers(d); let banners = '';
   if(mk.prep){ const c = S.plan.cycles[cycleOf(d)], ms = new Set(); for(let x=c.start;x<=c.end;x=add(x,1)) Object.keys(KEY_SLOT).forEach(k=>{ if(isFlex(x,k) || isCarry(x,k)) return; const mm = MEALS[S.plan.days[x][k]]; if(mm.tool!=='No cook' && mm.tool!=='Make day-of') ms.add(mm.n); }); banners += `<div class="banner prep">${I.pot}<div><b>Prep day</b>Cook: ${[...ms].map(esc).join(', ')}.</div></div>`; }
-  if(mk.thaw){ const nc = S.plan.cycles[mk.next]; banners += `<div class="banner thaw">${I.snow}<div><b>Move to the fridge tonight</b>${mk.items.map(t=>`${esc(FOODS[t.f].n)} ${FOODS[t.f].thawEach ? (n=>n+' '+(n>1?FOODS[t.f].thawUnit[1]:FOODS[t.f].thawUnit[0]))(Math.max(1,Math.ceil(t.need/FOODS[t.f].thawEach - .2))) : t.lb+' lb'} <span class="small muted">for ${nice(t.for)}</span>`).join(' · ')}</div></div>`; }
+  if(mk.thaw){ banners += `<div class="banner thaw">${I.snow}<div><b>Move to the fridge tonight</b>${mk.items.map(t=>`<div style="margin-top:4px">${thawDetail(t)} <span class="small muted">for ${nice(t.for)}</span></div>`).join('')}</div></div>`; }
   if(mk.shop){ const tr = ui._trips[mk.trip]; banners += `<div class="banner shop">${I.cart}<div><b>${tr.kind==='mid'?'Midweek fresh trip':'Shopping day'}</b><button class="linkbtn" data-act="goList" data-ti="${mk.trip}">See the list</button></div></div>`; }
   return banners;
 }
