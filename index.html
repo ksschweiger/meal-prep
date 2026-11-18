@@ -517,16 +517,26 @@ function groups(date,key){
     const only = g.comps.length===1 ? g.comps[0][0] : null;
     g.each = only && FOODS[only].each ? only : null;
     g.scoop = only==='protein';
+    // Serve by weight when it's meat or the recipe's steps tell you to weigh this group; otherwise by volume.
+    g.byWeight = g.comps.some(c=>isMeat(c[0])) || weighedInSteps(m, n);
     return g;
   });
   return {list, run, runId, meal:m, id};
+}
+// True when a recipe step says to weigh this group (e.g. "Weigh the potatoes, carrots and onion together"
+// or "Weigh each part"). Checked sentence by sentence so "weigh the empty pot" doesn't count.
+function weighedInSteps(m, name){
+  const stem = w => w.replace(/(es|s)$/,'');
+  const words = name.toLowerCase().split(/[^a-z]+/).filter(w=>w.length>2 && w!=='and').map(stem);
+  return (m.steps||[]).some(st => st.toLowerCase().replace(/\{[^}]*\}/g,'').split(/[.!?]/).some(t =>
+    /\bweigh/.test(t) && !/\bempty\b/.test(t) && (/each part|everything/.test(t) || t.split(/[^a-z]+/).map(stem).some(w=>words.includes(w)))));
 }
 function fmtPortion(g,p){
   const v = g.per[p];
   if(g.scoop) return (Math.round(v/31*2)/2||.5)+' scoop';
   // Cooked food: grams per person, from the real cooked weight once entered, else from the expected yield.
-  // Meat (and anything mixed with it) by weight; everything else by volume.
-  if(g.cooks) return g.comps.some(c=>isMeat(c[0])) ? (g.actual?'':'about ')+wt(v) : (COOKED_G_PER_CUP[g.comps[0][0]] || !HH[g.comps[0][0]] ? cupsOf(v, COOKED_G_PER_CUP[g.comps[0][0]]||150) : kitchenAmt(g.comps[0][0], v));
+  // Meat, and anything the steps say to weigh, by weight; everything else by volume.
+  if(g.cooks) return g.byWeight ? (g.actual?'':'about ')+wt(v) : (COOKED_G_PER_CUP[g.comps[0][0]] || !HH[g.comps[0][0]] ? cupsOf(v, COOKED_G_PER_CUP[g.comps[0][0]]||150) : kitchenAmt(g.comps[0][0], v));
   if(g.each){ const f = FOODS[g.each], n = g.each==='eggs' ? Math.max(1, Math.round(v/f.each)) : Math.max(.5, Math.round(v/f.each*2)/2), w = Math.floor(n), h = n-w ? '½' : ''; return (w||'')+h+' '+(n>1?f.unit[1]:f.unit[0]); }
   if(g.comps.length===1) return household(g.comps[0][0], v);
   return wt(v);
@@ -745,7 +755,7 @@ function mealCard(date,key,only,opts){
   const rows = G.list.map(g=> g.cooks || g.each || g.scoop
     ? `<div class="grow"><span class="gname">${esc(g.name)}</span><span class="tapes">${vis.map(p=>tape(p,fmtPortion(g,p))).join('')}</span></div>`
     : g.comps.map(c=>`<div class="grow"><span class="gname">${esc(FOODS[c[0]].n)}</span><span class="tapes">${vis.filter(p=>cg(c,p)>0).map(p=>tape(p,household(c[0],raw(date,p,c)))).join('')}</span></div>`).join('')).join('');
-  const cookedNote = G.list.some(g=>g.cooks) ? `<div class="note">${G.list.some(g=>g.cooks&&g.actual)?'Meat in cooked grams, from the cooked weight you entered. Sides in cups':'Meat in cooked grams (estimated until you enter the cooked weight under Recipe). Sides in cups'}. Cooked ${nice(cyc.start)}${idx>0||run[0]!==cyc.start?' · leftovers':''}.</div>` : '';
+  const cookedNote = G.list.some(g=>g.cooks) ? `<div class="note">${G.list.some(g=>g.cooks&&g.actual)?'Weighed items in cooked grams, from the cooked weight you entered. Other sides in cups':'Weighed items in cooked grams (estimated until you enter the cooked weight under Recipe). Other sides in cups'}. Cooked ${nice(cyc.start)}${idx>0||run[0]!==cyc.start?' · leftovers':''}.</div>` : '';
   // ingredients (raw, per person today)
   const live = G.run.filter(d=>!isFlex(d,key));
   // Batch amounts. If a different raw amount was used for a food (cooked[runId]._raw), scale its whole group (oil, glaze) to match; spices follow the first food.
@@ -758,7 +768,7 @@ function mealCard(date,key,only,opts){
   const stepTxt = st => esc(st).replace(/\{f:(\w+)\}/g,(x,f)=>`<b class="q">(${household(f,tot[f]||0)})</b>`).replace(/\{s:(\w+)\}/g,(x,k)=>sea[k]?`<b class="q">(${spiceAmt(sea[k][0],sea[k][1],lb,k)})</b>`:'');
   const help = G.list.filter(g=>g.cooks).map(g=>{
     const meat = g.comps.filter(c=>FOODS[c[0]].cat==='Meat').map(c=>{ const t = G.run.filter(d=>!isFlex(d,key)).reduce((a,d)=>a+eaters(d,key).reduce((b,p)=>b+raw(d,p,c),0),0); return `${FOODS[c[0]].n}: ${Math.round(t)} g raw → ${Math.max(1,Math.ceil(t/454-.05))} lb`; }).join('; ');
-    return `<div class="ch"><span class="t">${esc(g.name)}</span><input class="numin" inputmode="numeric" id="ck-${esc(G.runId+'-'+g.name).replace(/[^a-z0-9]/gi,'_')}" data-act="cooked" data-run="${esc(G.runId)}" data-grp="${esc(g.name)}" placeholder="${Math.round(g.exp)}" value="${g.actual||''}" aria-label="Cooked weight of ${esc(g.name)} in grams"><span class="s">${g.comps.some(c=>isMeat(c[0])) ? `Whole batch: ${Math.round(g.batchRaw)} g raw → about ${Math.round(g.exp)} g cooked. Enter the real cooked weight, minus the empty pot or container.` : `Whole batch: ${g.comps.length===1 ? household(g.comps[0][0], g.batchRaw) : 'see ingredients'} → about ${cupsOf(g.exp, COOKED_G_PER_CUP[g.comps[0][0]]||150)} cooked. Portions are in cups, so weighing is optional.`}${meat?'<br>'+meat:''}</span></div>`;
+    return `<div class="ch"><span class="t">${esc(g.name)}</span><input class="numin" inputmode="numeric" id="ck-${esc(G.runId+'-'+g.name).replace(/[^a-z0-9]/gi,'_')}" data-act="cooked" data-run="${esc(G.runId)}" data-grp="${esc(g.name)}" placeholder="${Math.round(g.exp)}" value="${g.actual||''}" aria-label="Cooked weight of ${esc(g.name)} in grams"><span class="s">${g.byWeight ? `Whole batch: ${Math.round(g.batchRaw)} g raw → about ${Math.round(g.exp)} g cooked. Enter the real cooked weight, minus the empty pot or container.` : `Whole batch: ${g.comps.length===1 ? household(g.comps[0][0], g.batchRaw) : 'see ingredients'} → about ${cupsOf(g.exp, COOKED_G_PER_CUP[g.comps[0][0]]||150)} cooked. Portions are in cups, so weighing is optional.`}${meat?'<br>'+meat:''}</span></div>`;
   }).join('');
   const tareTip = G.list.some(g=>g.cooks) ? `<div class="tare"><b>Before you start:</b> weigh each empty pot, pan or container you'll store the cooked food in and write it down, so you can subtract it when you weigh the finished batch.</div>` : '';
   const okey = date+'|'+key+(only?'|'+only:''), aid = 'm-'+okey.replace(/[^a-z0-9]/gi,'_');
