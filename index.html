@@ -286,7 +286,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-20a';
+const APP_VERSION = '2026-11-20b';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -471,7 +471,7 @@ function isFlex(d,k){ if(k==='ys') return true; if(S.plan.days[d] && !MEALS[S.pl
 const ui = {macOpen:{K:true,Y:true}, mealOpen:{}, tab:'calendar', sel:TODAY, ym:[pd(TODAY).getFullYear(), pd(TODAY).getMonth()], gc:null, ptab:'freezer'};
 
 // ---------- Math ----------
-const cg = (c,p) => p==='K' ? c[1] : p==='Y' ? c[2] : c[2]*S.settings.landen/100;
+const cg = (c,p) => p==='K' ? c[1] : p==='Y' ? c[2] : c[2]*.3; // Landen's real amount comes from raw() below
 const baseKcal = (id,p) => MEALS[id].comps.reduce((a,c)=>a + FOODS[c[0]].k*cg(c,p)/100, 0);
 function fac(date,p){
   if(p==='L') p='Y';
@@ -481,7 +481,18 @@ function fac(date,p){
   return Math.min(1.45, Math.max(.7, (S.macros[p].kcal - fixed)/b));
 }
 // Fixed items (the morning latte) stay the same size; everything else scales to hit targets.
-const raw = (date,p,c) => FOODS[c[0]].fixed ? cg(c,p) : cg(c,p)*fac(date,p);
+// Landen (dinner only): a 4-year-old's dinner is about a quarter of a ~1,400 cal day (USDA, moderately active boy),
+// so his plate is Kayla's dinner scaled to settings.landenKcal (default 375 cal), with at least 2 oz of cooked meat.
+const LANDEN_KCAL = () => S.settings.landenKcal || 375, LANDEN_MEAT_COOKED = 57;
+function landenScale(date){
+  const day = S.plan.days[date], m = day && MEALS[day.d]; if(!m) return {r:0, meat:1};
+  const fy = fac(date,'Y'); let kc = 0, meatCooked = 0;
+  m.comps.forEach(c=>{ const F = FOODS[c[0]], g = c[2]*fy; kc += F.k*g/100; if(F.cat==='Meat') meatCooked += g*(F.y||.72); });
+  const r = kc ? LANDEN_KCAL()/kc : 0, have = meatCooked*r;
+  return {r, meat: have>0 && have<LANDEN_MEAT_COOKED ? LANDEN_MEAT_COOKED/have : 1};
+}
+const raw = (date,p,c) => { if(p==='L'){ const L = landenScale(date); return c[2]*fac(date,'Y')*L.r*(FOODS[c[0]].cat==='Meat' ? L.meat : 1); }
+  return FOODS[c[0]].fixed ? cg(c,p) : cg(c,p)*fac(date,p); };
 function dayMacros(date,p){
   const day = S.plan.days[date], t = {k:0,p:0,c:0,f:0};
   PERSON_KEYS[p].filter(k=>!isFlex(date,k) && !isSkipped(date,k) && !isAway(date,p) && eaters(date,k).includes(p==='L'?'Y':p)).forEach(k=>MEALS[day[k]].comps.forEach(c=>{ const f = FOODS[c[0]], g = raw(date,p,c)/100; t.k+=f.k*g; t.p+=f.p*g; t.c+=f.c*g; t.f+=f.f*g; }));
@@ -841,7 +852,7 @@ function vDay(){
   const lockb = isLocked(d) ? `<div class="banner shop">${I.cart}<div><b>Shopping done · week locked</b>Swaps only use food you bought. New requests go to next week.</div></div>` : '';
   const seg = `<div class="seg"><button class="${S.view.mode==='mine'?'on':''}" data-act="vmode" data-v="mine">Just ${NAMES[S.view.me]}</button><button class="${S.view.mode==='both'?'on':''}" data-act="vmode" data-v="both">Both of us</button></div>`;
   return head + seg + lockb + wk + banners +
-    `<div class="card"><div class="sum" ${S.view.mode==='mine'?'style="grid-template-columns:1fr"':''}>${['K','Y'].filter(shows).map(p=>personSummary(d,p)).join('')}</div><p class="note" style="margin:10px 0 0">${(day.away||[]).length?`${day.away.map(p=>NAMES[p]).join(' & ')} away today: shared meals are sized without ${day.away.length>1?'them':'him'}. `:''}Landen eats dinner only, at ${S.settings.landen}% of Kayla's portion.</p></div>` +
+    `<div class="card"><div class="sum" ${S.view.mode==='mine'?'style="grid-template-columns:1fr"':''}>${['K','Y'].filter(shows).map(p=>personSummary(d,p)).join('')}</div><p class="note" style="margin:10px 0 0">${(day.away||[]).length?`${day.away.map(p=>NAMES[p]).join(' & ')} away today: shared meals are sized without ${day.away.length>1?'them':'him'}. `:''}Landen eats dinner only, about ${LANDEN_KCAL()} cal with at least 2 oz of meat.</p></div>` +
     slot('Breakfast',['c','kb','yb']) + slot('Lunch',['l']) + slot('Dinner',['d']) + slot('Snacks',['ks','ys']);
 }
 
@@ -1204,7 +1215,7 @@ function vMacros(){
       ${[['p','Protein'],['c','Carbs'],['f','Fat']].map(([k,l])=>`<tr><td>${l}</td><td><input id="m-${p}-${k}" inputmode="decimal" data-act="mac" data-p="${p}" data-f="${k}" value="${m[k]}" aria-label="${NAMES[p]} ${l} percent"><span class="unit">%</span></td><td><input id="m-${p}-${k}g" inputmode="numeric" data-act="macg" data-p="${p}" data-f="${k}" value="${g(k)}" aria-label="${NAMES[p]} ${l} grams"><span class="unit">g</span></td></tr>`).join('')}
       </table></div></div>`; };
   return `<h2 style="font-size:22px">Daily targets</h2><p class="note" style="margin:-6px 0 0">Enter your weight and goal to fill these in. Change a percent or grams and the other updates. Portions in the calendar rescale to match.</p>` + card('K') + card('Y') +
-    `<div class="card"><div class="row between"><div><b>Landen</b><div class="note">Dinner only, as a share of Kayla's portion</div></div><div class="stepper"><button data-act="lan" data-d="-5" aria-label="Less">−</button><span>${S.settings.landen}%</span><button data-act="lan" data-d="5" aria-label="More">+</button></div></div></div>`;
+    `<div class="card"><div class="row between"><div><b>Landen</b><div class="note">Dinner only. About 375 cal is right for a 4-year-old (a quarter of a ~1,400 cal day), with at least 2 oz of meat.</div></div><div class="stepper"><button data-act="lan" data-d="-25" aria-label="Less">−</button><span>${LANDEN_KCAL()} cal</span><button data-act="lan" data-d="25" aria-label="More">+</button></div></div></div>`;
 }
 
 function vSettings(){
@@ -1381,7 +1392,7 @@ document.addEventListener('click', e=>{
   else if(a==='popen'){ e.preventDefault(); ui.popen = ui.popen||{}; ui.popen[t.dataset.t] = !ui.popen[t.dataset.t]; render(); }
   else if(a==='signout'){ signOut(false); }
   else if(a==='refresh' || a==='retry'){ boot().then(()=>toast('Up to date.')); }
-  else if(a==='lan'){ S.settings.landen = Math.max(5, Math.min(60, S.settings.landen + +t.dataset.d)); changed('Macros'); render(); }
+  else if(a==='lan'){ S.settings.landenKcal = Math.max(200, Math.min(700, LANDEN_KCAL() + +t.dataset.d)); changed('Macros'); render(); }
   else if(a==='prepday'){ const i = +t.dataset.i, p = S.settings.prep; S.settings.prep = p.includes(i) ? p.filter(x=>x!==i) : [...p,i].sort(); changed('Settings'); render(); }
   else if(a==='set'){ const k = t.dataset.k, lim = {maxRun:[1,5], lead:[1,6]}[k]; S.settings[k] = Math.max(lim[0], Math.min(lim[1], S.settings[k] + +t.dataset.d)); changed('Settings'); render(); }
   else if(a==='openReq'){ openSheet(reqSheet()); }
