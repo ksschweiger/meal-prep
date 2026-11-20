@@ -286,7 +286,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-14a';
+const APP_VERSION = '2026-11-20a';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -536,9 +536,9 @@ function fmtPortion(g,p){
   if(g.scoop) return (Math.round(v/31*2)/2||.5)+' scoop';
   // Cooked food: grams per person, from the real cooked weight once entered, else from the expected yield.
   // Meat, and anything the steps say to weigh, by weight; everything else by volume.
-  if(g.cooks) return g.byWeight ? (g.actual?'':'about ')+wt(v) : (COOKED_G_PER_CUP[g.comps[0][0]] || !HH[g.comps[0][0]] ? cupsOf(v, COOKED_G_PER_CUP[g.comps[0][0]]||150) : kitchenAmt(g.comps[0][0], v));
+  // Serving sizes are in grams (cooked grams for cooked food). The one exception: plain rice is served in cups.
+  if(g.cooks) return g.comps.every(c=>c[0]==='rice') ? cupsOf(v, COOKED_G_PER_CUP.rice||158) : (g.actual?'':'about ')+wt(v);
   if(g.each){ const f = FOODS[g.each], n = g.each==='eggs' ? Math.max(1, Math.round(v/f.each)) : Math.max(.5, Math.round(v/f.each*2)/2), w = Math.floor(n), h = n-w ? '½' : ''; return (w||'')+h+' '+(n>1?f.unit[1]:f.unit[0]); }
-  if(g.comps.length===1) return household(g.comps[0][0], v);
   return wt(v);
 }
 const cycleOf = date => S.plan.days[date] ? S.plan.days[date].cyc : -1;
@@ -754,8 +754,8 @@ function mealCard(date,key,only,opts){
   const tape = (p,txt) => `<span class="tape" style="--pc:${PC[p]}"><b title="${NAMES[p]}">${TAPE_LETTER[p]||p}</b>${txt}</span>`;
   const rows = G.list.map(g=> g.cooks || g.each || g.scoop
     ? `<div class="grow"><span class="gname">${esc(g.name)}</span><span class="tapes">${vis.map(p=>tape(p,fmtPortion(g,p))).join('')}</span></div>`
-    : g.comps.map(c=>`<div class="grow"><span class="gname">${esc(FOODS[c[0]].n)}</span><span class="tapes">${vis.filter(p=>cg(c,p)>0).map(p=>tape(p,household(c[0],raw(date,p,c)))).join('')}</span></div>`).join('')).join('');
-  const cookedNote = G.list.some(g=>g.cooks) ? `<div class="note">${G.list.some(g=>g.cooks&&g.actual)?'Weighed items in cooked grams, from the cooked weight you entered. Other sides in cups':'Weighed items in cooked grams (estimated until you enter the cooked weight under Recipe). Other sides in cups'}. Cooked ${nice(cyc.start)}${idx>0||run[0]!==cyc.start?' · leftovers':''}.</div>` : '';
+    : g.comps.map(c=>`<div class="grow"><span class="gname">${esc(FOODS[c[0]].n)}</span><span class="tapes">${vis.filter(p=>cg(c,p)>0).map(p=>tape(p,wt(raw(date,p,c)))).join('')}</span></div>`).join('')).join('');
+  const cookedNote = G.list.some(g=>g.cooks) ? `<div class="note">${G.list.some(g=>g.cooks&&g.actual)?'Servings in cooked grams (rice in cups), from the cooked weights you entered':'Servings in cooked grams (rice in cups), estimated until you enter the cooked weights'}. Cooked ${nice(cyc.start)}${idx>0||run[0]!==cyc.start?' · leftovers':''}.</div>` : '';
   // ingredients (raw, per person today)
   const live = G.run.filter(d=>!isFlex(d,key));
   // Batch amounts. If a different raw amount was used for a food (cooked[runId]._raw), scale its whole group (oil, glaze) to match; spices follow the first food.
@@ -873,7 +873,7 @@ function servingCard(d,k,label){
   const why = p => isAway(d,p) ? 'Away' : isFlex(d,k) ? 'Flex' : isSkipped(d,k) ? 'Skipped' : 'Out';
   if(whole) return `<div class="card serve" id="${sid}"><div class="eyebrow">${label}</div><div class="muted" style="padding:6px 0 2px">${isSkipped(d,k)?'Skipped':isFlex(d,k)?'Flex. Eat leftovers from the week first.':'Nobody home for this one.'}</div></div>`;
   const G = groups(d,k), fmt = v => String(v).replace(/^about /,'').replace(/ \(([^)]+)\)/,'<br><span class="small muted">$1</span>');
-  const rows = G.list.flatMap(g => g.cooks || g.each || g.scoop ? [[g.name, p=>fmtPortion(g,p)]] : g.comps.map(c=>[FOODS[c[0]].n, p=>cg(c,p)>0?household(c[0],raw(d,p,c)):'—']));
+  const rows = G.list.flatMap(g => g.cooks || g.each || g.scoop ? [[g.name, p=>fmtPortion(g,p)]] : g.comps.map(c=>[FOODS[c[0]].n, p=>cg(c,p)>0?wt(raw(d,p,c)):'—']));
   const off = all.filter(p=>!ppl.includes(p));
   const body = rows.map((r,i)=>`<tr><td>${esc(r[0])}</td>${all.map(p=>ppl.includes(p) ? `<td>${fmt(r[1](p))}</td>` : `<td class="muted">${why(p)}</td>`).join('')}</tr>`).join('');
   const open = !!(ui.serveOpen||{})[d+'|'+k], shown = !!(ui.serveShow||{})[d+'|'+k];
