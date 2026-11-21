@@ -306,7 +306,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-20dev5';
+const APP_VERSION = '2026-11-21dev6';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -357,8 +357,8 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>'
 // ---------- Live data ----------
 const API = 'https://script.google.com/macros/s/AKfycbxA3OApqNe6cCAINSDweKl0207wSilqda7bg3G5AdnNQ6vK7edcavIumCy-4MaAJVI/exec';
 const CLIENT_ID = '483809178986-kva2i39rl5iv08qkkfkdojla0ve6p5gq.apps.googleusercontent.com';
-const SYNC_KEYS = ['photos','settings','macros','profile','plan','ratings','cooked','checks','locked','lockAdds','skipped','shopMoves','haveIt','styles','drinkOn','ptr','priceJobs','prices','shopLog'];
-const DEFAULTS = {photos:{}, priceJobs:{}, prices:{}, shopLog:[], settings:{prep:[1,3],shopDay:1,weekend:'light',maxRun:3,lead:3,store:'Meijer pickup',budget:750,landen:25}, macros:{K:{kcal:2600,p:35,c:40,f:25},Y:{kcal:1700,p:35,c:40,f:25}}, profile:{}, plan:null, ratings:{}, cooked:{}, checks:{}, locked:{}, lockAdds:{}, skipped:{}, shopMoves:{}, haveIt:{}, styles:[], drinkOn:{}, ptr:{}};
+const SYNC_KEYS = ['punits','photos','settings','macros','profile','plan','ratings','cooked','checks','locked','lockAdds','skipped','shopMoves','haveIt','styles','drinkOn','ptr','priceJobs','prices','shopLog'];
+const DEFAULTS = {punits:{}, photos:{}, priceJobs:{}, prices:{}, shopLog:[], settings:{prep:[1,3],shopDay:1,weekend:'light',maxRun:3,lead:3,store:'Meijer pickup',budget:750,landen:25}, macros:{K:{kcal:2600,p:35,c:40,f:25},Y:{kcal:1700,p:35,c:40,f:25}}, profile:{}, plan:null, ratings:{}, cooked:{}, checks:{}, locked:{}, lockAdds:{}, skipped:{}, shopMoves:{}, haveIt:{}, styles:[], drinkOn:{}, ptr:{}};
 const EMPTY_PLAN = () => ({cycles:[], days:{}, start:TODAY, end:TODAY});
 let S = null, USER = null, TOKEN = null, PANTRY = [];
 const SNAP = {}, PSNAP = {}; let FSNAP = '';
@@ -689,10 +689,14 @@ const HH = {
 };
 function frac(n){ const w = Math.floor(n), r = Math.round((n-w)*4)/4, f = {0:'',.25:'¼',.5:'½',.75:'¾',1:''}[r]; const W = r===1 ? w+1 : w; return (W||(f?'':'0'))+(W&&f?' ':'')+f; }
 // Scale-first amounts: grams, plus ounces once it's an ounce or more.
+// Each person picks grams or ounces in My profile; everything weighed shows in that unit (rice stays in cups).
+const WU = () => (S && S.view && ((S.settings||{}).wunit||{})[S.view.me]) || 'g';
+const inUnit = g => WU()==='oz' ? Math.round(g/28.35*10)/10 : Math.round(g);
 function wt(g){
+  if(WU()==='oz') return (g/28.35 < 10 ? Math.round(g/28.35*10)/10 : Math.round(g/28.35))+' oz';
   if(g < 10) return (Math.round(g*2)/2)+' g';
   const r = g >= 100 ? Math.round(g/5)*5 : Math.round(g);
-  return r+' g'+(g >= 28 ? ' ('+(g/28.35).toFixed(1).replace(/\.0$/,'')+' oz)' : '');
+  return r+' g';
 }
 // Items you count rather than weigh keep their count, with the weight alongside.
 const COUNTED = ['eggs','tortilla','emuffin'];
@@ -801,7 +805,7 @@ function mealCard(date,key,only,opts){
   const stepTxt = st => esc(st).replace(/\{f:(\w+)\}/g,(x,f)=>`<b class="q">(${household(f,tot[f]||0)})</b>`).replace(/\{s:(\w+)\}/g,(x,k)=>sea[k]?`<b class="q">(${spiceAmt(sea[k][0],sea[k][1],lb,k)})</b>`:'');
   const help = G.list.filter(g=>g.cooks).map(g=>{
     const meat = g.comps.filter(c=>FOODS[c[0]].cat==='Meat').map(c=>{ const t = G.run.filter(d=>!isFlex(d,key)).reduce((a,d)=>a+eaters(d,key).reduce((b,p)=>b+raw(d,p,c),0),0); return `${FOODS[c[0]].n}: ${Math.round(t)} g raw → ${Math.max(1,Math.ceil(t/454-.05))} lb`; }).join('; ');
-    return `<div class="ch"><span class="t">${esc(g.name)}</span><input class="numin" inputmode="numeric" id="ck-${esc(G.runId+'-'+g.name).replace(/[^a-z0-9]/gi,'_')}" data-act="cooked" data-run="${esc(G.runId)}" data-grp="${esc(g.name)}" placeholder="${Math.round(g.exp)}" value="${g.actual||''}" aria-label="Cooked weight of ${esc(g.name)} in grams"><span class="s">${g.byWeight ? `Whole batch: ${Math.round(g.batchRaw)} g raw → about ${Math.round(g.exp)} g cooked. Enter the real cooked weight, minus the empty pot or container.` : `Whole batch: ${g.comps.length===1 ? household(g.comps[0][0], g.batchRaw) : 'see ingredients'} → about ${cupsOf(g.exp, COOKED_G_PER_CUP[g.comps[0][0]]||150)} cooked. Portions are in cups, so weighing is optional.`}${meat?'<br>'+meat:''}</span></div>`;
+    return `<div class="ch"><span class="t">${esc(g.name)}</span><input class="numin" inputmode="numeric" id="ck-${esc(G.runId+'-'+g.name).replace(/[^a-z0-9]/gi,'_')}" data-act="cooked" data-run="${esc(G.runId)}" data-grp="${esc(g.name)}" placeholder="${inUnit(g.exp)}" value="${g.actual?inUnit(g.actual):''}" aria-label="Cooked weight of ${esc(g.name)} in ${WU()==='oz'?'ounces':'grams'}"><span class="s">${g.byWeight ? `Whole batch: ${wt(g.batchRaw)} raw → about ${wt(g.exp)} cooked. Enter the real cooked weight, minus the empty pot or container.` : `Whole batch: ${g.comps.length===1 ? household(g.comps[0][0], g.batchRaw) : 'see ingredients'} → about ${cupsOf(g.exp, COOKED_G_PER_CUP[g.comps[0][0]]||150)} cooked. Portions are in cups, so weighing is optional.`}${meat?'<br>'+meat:''}</span></div>`;
   }).join('');
   const tareTip = G.list.some(g=>g.cooks) ? `<div class="tare"><b>Before you start:</b> weigh each empty pot, pan or container you'll store the cooked food in and write it down, so you can subtract it when you weigh the finished batch.</div>` : '';
   const okey = date+'|'+key+(only?'|'+only:''), aid = 'm-'+okey.replace(/[^a-z0-9]/gi,'_');
@@ -1221,9 +1225,13 @@ function pantryBuys(ci){
 // Pantry sizes are kept in ounces (the sheet's Size column); other units convert, "count" stays a count.
 const PUNITS = ['oz','lb','g','fl oz','count'];
 const toOz = (v,u) => u==='lb' ? v*16 : u==='g' ? v/28.35 : v;
+const fromOz = (v,u) => u==='lb' ? Math.round(v/16*100)/100 : u==='g' ? Math.round(v*28.35) : Math.round(v*10)/10;
+// Each pantry item keeps the unit it was entered in; with none saved it follows your grams/ounces choice.
+const punit = r => (S.punits||{})[String(r.item).toLowerCase()] || (WU()==='oz'?'oz':'g');
+const fmtSize = r => fromOz(r.size||0, punit(r))+' '+punit(r);
 function pantryEdit(row){ const r = PANTRY.find(x=>x.row===row); if(!r) return;
   openSheet(`<div class="row between"><h2>${esc(r.item)}</h2><button class="iconbtn" data-act="closeSheet" aria-label="Close">${I.x}</button></div>
-    <div class="field"><label for="pe-size">Container size (oz)</label><input class="textin" id="pe-size" type="number" step="0.1" min="0" value="${r.size||''}"></div>
+    <div class="field"><label for="pe-size">Container size</label><div class="row" style="gap:8px"><input class="textin" id="pe-size" type="number" step="0.1" min="0" value="${r.size?fromOz(r.size,punit(r)):''}" style="flex:1"><select class="textin" id="pe-unit" style="flex:0 0 96px">${PUNITS.map(u=>`<option ${u===punit(r)?'selected':''}>${u}</option>`).join('')}</select></div></div>
     <div class="field"><label for="pe-qty">How many on hand</label><input class="textin" id="pe-qty" type="number" step="0.25" min="0" value="${r.left===null?'':r.left}"><span class="note">Containers. 1 = one full, 2.5 = two full and a half, 0 = out.</span></div>
     <button class="btn primary block" data-act="psave" data-row="${row}">Save</button>`); }
 function vPantry(){
@@ -1242,9 +1250,9 @@ function vPantry(){
   return seg + rcb + types.map(t=>{ const rows = PANTRY.filter(r=>(r.type||'Other')===t);
     const low = rows.filter(r=>r.left!==null && r.left<=.25).length;
     return `<details class="card more" ${ui.popen&&ui.popen[t]?'open':''} data-type="${esc(t)}"><summary data-act="popen" data-t="${esc(t)}">${esc(t)} <span class="small muted">· ${rows.length}${low?` · ${low} low`:''}</span></summary>${rows.map(r=>{ const fr = r.left===null?null:r.left, near = fr===null?null:[1,.75,.5,.25,0].reduce((a,v)=>Math.abs(v-Math.min(fr,1))<Math.abs(a-Math.min(fr,1))?v:a,1);
-      return `<div class="listrow" style="flex-wrap:wrap"><span class="grow1" style="min-width:130px"><button class="pitem" data-act="pedit" data-row="${r.row}">${esc(r.item)} <span class="small" style="color:var(--accent)">Edit</span></button><br><span class="small muted">${r.brand?esc(r.brand)+' · ':''}${r.size} oz${fr!==null&&fr>1.05?` · ${Math.round(fr*10)/10}× on hand`:''}${r.buy==='Never'?' · never bought':''}</span></span><div class="seg mini">${[1,.75,.5,.25,0].map(v=>`<button class="${fr!==null&&fr<=1.05&&near===v?'on '+(v===0?'out':v<=.25?'low':'have'):''}" data-act="sp" data-row="${r.row}" data-v="${v}" aria-label="${esc(r.item)} ${lbl[v]}">${lbl[v]}</button>`).join('')}</div></div>`; }).join('')}</details>`; }).join('') +
+      return `<div class="listrow" style="flex-wrap:wrap"><span class="grow1" style="min-width:130px"><button class="pitem" data-act="pedit" data-row="${r.row}">${esc(r.item)} <span class="small" style="color:var(--accent)">Edit</span></button><br><span class="small muted">${r.brand?esc(r.brand)+' · ':''}${fmtSize(r)}${fr!==null&&fr>1.05?` · ${Math.round(fr*10)/10}× on hand`:''}${r.buy==='Never'?' · never bought':''}</span></span><div class="seg mini">${[1,.75,.5,.25,0].map(v=>`<button class="${fr!==null&&fr<=1.05&&near===v?'on '+(v===0?'out':v<=.25?'low':'have'):''}" data-act="sp" data-row="${r.row}" data-v="${v}" aria-label="${esc(r.item)} ${lbl[v]}">${lbl[v]}</button>`).join('')}</div></div>`; }).join('')}</details>`; }).join('') +
     `<div class="card"><div class="eyebrow">Add an item</div><form class="addform" data-form="sp" style="margin:6px 0 0;flex-wrap:wrap"><input id="sp-name" placeholder="Name" aria-label="Item name" style="flex:1 1 100%"><select id="sp-kind" aria-label="Type" style="flex:1 1 140px">${types.map(k=>`<option>${esc(k)}</option>`).join('')}</select>
-      <span class="row" style="gap:6px;flex:1 1 100%;align-items:center"><span class="small" style="min-width:100px">Container size</span><input id="sp-size" type="number" step="0.1" min="0" placeholder="16" aria-label="Container size" style="flex:0 0 72px"><select id="sp-unit" aria-label="Unit" style="flex:0 0 84px">${PUNITS.map(u=>`<option>${u}</option>`).join('')}</select></span>
+      <span class="row" style="gap:6px;flex:1 1 100%;align-items:center"><span class="small" style="min-width:100px">Container size</span><input id="sp-size" type="number" step="0.1" min="0" placeholder="16" aria-label="Container size" style="flex:0 0 72px"><select id="sp-unit" aria-label="Unit" style="flex:0 0 84px">${PUNITS.map(u=>`<option ${u===(WU()==='oz'?'oz':'g')?'selected':''}>${u}</option>`).join('')}</select></span>
       <span class="row" style="gap:6px;flex:1 1 100%;align-items:center"><span class="small" style="min-width:100px">How many</span><input id="sp-qty" type="number" step="0.25" min="0" value="1" aria-label="How many containers on hand" style="flex:0 0 72px"><span class="small muted">containers (1.5 = one full + one half)</span></span>
       <button class="btn primary" type="submit" style="flex:1 1 100%">Add to pantry</button></form></div>
     <p class="note">Tap roughly how much is left. Recipes that need more than you have put it on the grocery list; close calls show under Check before you shop. You can also edit the Pantry tab in the Google Sheet.</p>`;
@@ -1406,10 +1414,12 @@ document.addEventListener('click', e=>{
   else if(a==='rmphoto'){ const p = t.dataset.p; if(p!==S.view.me && !KIDS.includes(p)) return; S.photos = Object.assign({}, S.photos); delete S.photos[p]; changed('Profile'); render(); }
   else if(a==='pedit'){ pantryEdit(+t.dataset.row); }
   else if(a==='psave'){ const r = PANTRY.find(x=>x.row===+t.dataset.row); if(!r) return;
-    const size = parseFloat(document.getElementById('pe-size').value), left = parseFloat(document.getElementById('pe-qty').value), up = {row:r.row};
+    const unit = document.getElementById('pe-unit').value, size = Math.round(toOz(parseFloat(document.getElementById('pe-size').value), unit)*10)/10, left = parseFloat(document.getElementById('pe-qty').value), up = {row:r.row};
     if(!isNaN(size) && size>=0){ r.size = size; up.size = size; } if(!isNaN(left) && left>=0){ r.left = left; up.left = left; PSNAP[r.row] = left; }
+    S.punits = Object.assign({}, S.punits, {[String(r.item).toLowerCase()]:unit}); changed('Pantry units');
     closeSheet(); rebuildSpices(); render(); setSync('Saving…');
     api('pantry', {updates:[up]}).then(()=>{ setSync('Saved'); toast('Updated '+r.item+'.'); }).catch(e=>{ setSync('Not saved'); toast('Could not save: '+e.message); }); }
+  else if(a==='wunit'){ S.settings.wunit = Object.assign({}, S.settings.wunit, {[S.view.me]:t.dataset.v}); changed('Profile'); render(); }
   else if(a==='pcolor'){ const p = t.dataset.p; if(p!==S.view.me && !KIDS.includes(p)) return; S.settings.colors = Object.assign({}, S.settings.colors, {[p]:+t.dataset.i}); changed('Settings'); render(); }
   else if(a==='theme'){ lsSet('mp-theme', t.dataset.v==='auto'?null:t.dataset.v); applyTheme(); render(); }
   else if(a==='weekend'){ S.settings.weekend = t.dataset.v; changed('Settings'); render(); }
@@ -1462,7 +1472,7 @@ document.addEventListener('click', e=>{
 
 document.addEventListener('change', e=>{
   const t = e.target, a = t.dataset.act;
-  if(a==='cooked'){ const v = parseFloat(t.value); S.cooked[t.dataset.run] = S.cooked[t.dataset.run]||{}; if(v>0) S.cooked[t.dataset.run][t.dataset.grp] = v; else delete S.cooked[t.dataset.run][t.dataset.grp]; changed('Cooked weights'); const sc = window.scrollY; render(); window.scrollTo(0,sc); toast('Portions updated from the cooked weight.'); }
+  if(a==='cooked'){ const v = parseFloat(t.value)*(WU()==='oz'?28.35:1); S.cooked[t.dataset.run] = S.cooked[t.dataset.run]||{}; if(v>0) S.cooked[t.dataset.run][t.dataset.grp] = v; else delete S.cooked[t.dataset.run][t.dataset.grp]; changed('Cooked weights'); const sc = window.scrollY; render(); window.scrollTo(0,sc); toast('Portions updated from the cooked weight.'); }
   else if(a==='drinkon'){ S.drinkOn = S.drinkOn||{}; S.drinkOn[t.dataset.date] = t.checked; changed('Drinks'); const id = S.plan.days[t.dataset.date].d; render(); if(t.checked) showDrink(id); }
   else if(a==='photo'){ const f = t.files && t.files[0], p = t.dataset.p; t.value = ''; if(!f || (p!==S.view.me && !KIDS.includes(p))) return;
     squarePhoto(f).then(url=>{ S.photos = Object.assign({}, S.photos, {[p]:url}); changed('Profile'); render(); toast('Photo saved.'); }).catch(()=>toast('Could not read that photo.')); }
@@ -1501,8 +1511,8 @@ document.addEventListener('submit', e=>{
     if(ex) ex.lb += lb; else S.freezer.push({item:food==='other'?nm:FOODS[food].n, key:food==='other'?'':food, food:food==='other'?'':food, lb, priority:'Normal', cost:'', notes:''});
     changed('Freezer'); render(); toast(`Added ${lb} lb.`); }
   if(f==='sp'){ const nm = document.getElementById('sp-name').value.trim(); if(!nm) return; const raw = parseFloat(document.getElementById('sp-size').value)||0, unit = document.getElementById('sp-unit').value, type = document.getElementById('sp-kind').value;
-    const qty = Math.max(0, parseFloat(document.getElementById('sp-qty').value)); const size = Math.round(toOz(raw,unit)*10)/10;
-    api('pantry', {adds:[{item:nm, type, size, left:isNaN(qty)?1:qty, notes:'Added in the app'+(unit==='oz'?'':` · ${raw} ${unit}`)}]}).then(()=>boot()).then(()=>toast(`Added ${nm}. Claude will link it to recipes on the next check.`)).catch(err=>toast('Could not add: '+err.message)); }
+    const qty = Math.max(0, parseFloat(document.getElementById('sp-qty').value)); S.punits = Object.assign({}, S.punits, {[nm.toLowerCase()]:unit}); changed('Pantry units'); clearTimeout(syncT); sync(); const size = Math.round(toOz(raw,unit)*10)/10;
+    api('pantry', {adds:[{item:nm, type, size, left:isNaN(qty)?1:qty, notes:'Added in the app'}]}).then(()=>boot()).then(()=>toast(`Added ${nm}. Claude will link it to recipes on the next check.`)).catch(err=>toast('Could not add: '+err.message)); }
 });
 
 // Shrink a phone photo before upload so it travels fast.
@@ -1589,6 +1599,7 @@ function vProfile(){
   const me = S.view.me, c = S.settings.colors || {};
   const block = p => `<div class="row" style="gap:14px;align-items:center">${avatar(p,null,true)}<div style="flex:1"><h3 style="font-size:18px">${NAMES[p]}</h3>
       <div class="row" style="gap:8px;margin-top:6px"><label class="btn" for="ph-${p}" style="padding:6px 12px;cursor:pointer">${(S.photos||{})[p]?'Change photo':'Add photo'}</label><input type="file" id="ph-${p}" accept="image/*" data-act="photo" data-p="${p}" hidden>${(S.photos||{})[p]?`<button class="linkbtn" data-act="rmphoto" data-p="${p}">Remove</button>`:''}</div></div></div>
+    ${p===S.view.me?`<div class="field" style="margin-top:12px"><span class="lbl">Weigh in</span><div class="seg">${[['g','Grams'],['oz','Ounces']].map(([v,l])=>`<button class="${WU()===v?'on':''}" data-act="wunit" data-v="${v}">${l}</button>`).join('')}</div><span class="note">Servings, cooked weights and pantry sizes show in this unit. Rice stays in cups.</span></div>`:''}
     <div class="field" style="margin-top:12px"><span class="lbl">Color</span><span class="chips" style="gap:8px">${PALETTE.map((sw,i)=>`<button class="swatch ${c[p]===i?'on':''}" style="--sw:${isDark()?sw[2]:sw[1]}" data-act="pcolor" data-p="${p}" data-i="${i}" aria-label="${sw[0]}"></button>`).join('')}</span></div>`;
   const kids = KIDS.includes(me) ? [] : KIDS.filter(p=>NAMES[p]);
   return `<h2 style="font-size:22px">My profile</h2><div class="card">${block(me)}</div>`
