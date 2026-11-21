@@ -1,5 +1,7 @@
 # Dev and release process
 
+**Naming (Nov 21, 2026):** this repo is **Dev** = Kaleb's family app (Google Sheet, Kroger cart, price checks). No sandbox; changes go straight to `index.html`. The future live app is **Prod** (separate project on Supabase + MCP server, grocery list only) and its test copy is **Sandbox**. The `dev/` folder here is a leftover test copy and can be removed if Kaleb agrees.
+
 **Current mode (Nov 21, 2026): changes go straight to production (`index.html`).** Use Dev only when Kaleb asks to build in Dev; before starting, copy `index.html` into `dev/index.html` and re-add the DEV banner.
 
 - **Production:** https://ksschweiger.github.io/meal-prep/ (`index.html`)
