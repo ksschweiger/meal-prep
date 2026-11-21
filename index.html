@@ -159,6 +159,7 @@ main{padding-block:14px 110px}
 .cookhelp.pform{display:grid;grid-template-columns:72px 1fr;gap:8px 10px;align-items:center}
 .pflbl{font-weight:700;font-size:13.5px}.pfctl{display:flex;gap:6px;min-width:0}
 .pfin{flex:1 1 0;min-width:0;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:7px 8px;font:inherit;font-size:15px}
+.macbar{display:flex;align-items:center;gap:8px;margin-top:10px;padding:8px 10px;border-radius:10px;background:color-mix(in srgb,var(--warn) 16%,var(--surface))}.macbar span{flex:1;font-weight:700}.macbar .btn{padding:6px 14px}
 .swatch.taken{opacity:.25;cursor:not-allowed}
 .swatch.on{box-shadow:0 0 0 2px var(--ink)}
 .av{overflow:hidden;display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:30px;padding:0 6px;border-radius:999px;background:var(--pc);color:var(--surface);font:700 12.5px var(--body)}
@@ -328,7 +329,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-21n';
+const APP_VERSION = '2026-11-21o';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -460,7 +461,8 @@ let syncT = null;
 function save(){ clearTimeout(syncT); syncT = setTimeout(sync, 700); }
 function sync(){
   if(!S || !TOKEN) return;
-  const data = {}; SYNC_KEYS.forEach(k=>{ const js = JSON.stringify(S[k]); if(js!==SNAP[k]){ data[k] = S[k]; SNAP[k] = js; } });
+  const hold = Object.keys(ui.macSnap||{}).length ? ['macros','profile'] : [];
+  const data = {}; SYNC_KEYS.filter(k=>!hold.includes(k)).forEach(k=>{ const js = JSON.stringify(S[k]); if(js!==SNAP[k]){ data[k] = S[k]; SNAP[k] = js; } });
   const ups = PANTRY.filter(r=>PSNAP[r.row]!==r.left).map(r=>{ PSNAP[r.row] = r.left; return {row:r.row, left:r.left}; });
   const fz = JSON.stringify(S.freezer.map(fzOut));
   const jobs = [];
@@ -1341,6 +1343,10 @@ const tolOf = p => TOL.find(t=>t[0]===((S.settings.tol||{})[p]||'balanced'));
 function tolField(p){ const cur = tolOf(p);
   return `<div class="field" style="margin-top:12px"><span class="lbl">How close to targets</span><div class="seg">${TOL.map(t=>`<button class="${cur[0]===t[0]?'on':''}" data-act="tol" data-p="${p}" data-v="${t[0]}">${t[1]} ±${t[2]}%</button>`).join('')}</div><span class="note">${cur[3]}</span></div>`; }
 // Body details for the calorie math, one labeled row each. Weight is stored in lb and height in inches; units are just for display.
+// Macro edits are a draft until Save; Undo puts back what was saved.
+function markMac(p){ ui.macSnap = ui.macSnap||{}; if(!ui.macSnap[p]) ui.macSnap[p] = {m: JSON.stringify(S.macros[p]), pr: JSON.stringify((S.profile||{})[p]||null)};
+  const b = document.getElementById('macbar-'+p); if(b) b.hidden = false; }
+const macBar = p => `<div class="macbar" id="macbar-${p}" ${(ui.macSnap||{})[p]?'':'hidden'}><span class="small">Unsaved changes</span><button class="btn" data-act="macundo" data-p="${p}">Undo</button><button class="btn primary" data-act="macsave" data-p="${p}">Save</button></div>`;
 function profForm(p){
   const pr = (S.profile||{})[p]||{}, b = bodyOf(p), own = pr.mode!=='auto', wu = pr.wtUnit||'lb', hu = pr.htUnit||'imp';
   const wShow = pr.wt ? (wu==='kg' ? Math.round(pr.wt*.4536*10)/10 : pr.wt) : '';
@@ -1369,7 +1375,7 @@ function vMacros(){
       <table class="mtable" style="margin-top:8px"><tr><th>Daily</th><th>Percent</th><th>Grams</th></tr>
       <tr><td>Calories</td><td colspan="2"><input id="m-${p}-kcal" inputmode="numeric" data-act="mac" data-p="${p}" data-f="kcal" value="${m.kcal}" aria-label="${NAMES[p]} calories"><span class="unit">cal</span></td></tr>
       ${[['p','Protein'],['c','Carbs'],['f','Fat']].map(([k,l])=>`<tr><td>${l}</td><td><input id="m-${p}-${k}" inputmode="decimal" data-act="mac" data-p="${p}" data-f="${k}" value="${m[k]}" aria-label="${NAMES[p]} ${l} percent"><span class="unit">%</span></td><td><input id="m-${p}-${k}g" inputmode="numeric" data-act="macg" data-p="${p}" data-f="${k}" value="${g(k)}" aria-label="${NAMES[p]} ${l} grams"><span class="unit">g</span></td></tr>`).join('')}
-      </table>${tolField(p)}</div></div>`; };
+      </table>${macBar(p)}${tolField(p)}</div></div>`; };
   return `<h2 style="font-size:22px">Daily targets</h2><p class="note" style="margin:-6px 0 0">Enter your weight and goal to fill these in. Change a percent or grams and the other updates. Portions in the calendar rescale to match.</p>` + card('K') + card('Y') + `<p class="note">Kids' dinner portions are in Family settings.</p>`;
 }
 
@@ -1485,7 +1491,7 @@ document.addEventListener('click', e=>{
   if(a==='closeSheet'){ if(e.target===t || t.tagName==='BUTTON') closeSheet(); return; }
   if(['cooked','mac','macg','budget','store','check','drinkon','prof','spoz','receipt','fzpri'].includes(a)) return;
   if(a==='memenu'){ ui.menu = !ui.menu; render(); return; }
-  if(a==='tab'){ ui.menu = false; if(t.dataset.tab==='family'){ ui.macOpen = {}; ui.kidOpen = {}; ui.famShared = false; } if(t.dataset.tab==='groceries' && ui.tab!=='groceries') ui.trip = null; ui.tab = t.dataset.tab==='calendar' && ui.calLast && !CAL_TABS.includes(ui.tab) ? ui.calLast : t.dataset.tab; render(); window.scrollTo(0,0); }
+  if(a==='tab'){ ui.menu = false; if(ui.tab==='family' && t.dataset.tab!=='family' && Object.keys(ui.macSnap||{}).length) toast('Macro changes not saved yet. Save or Undo them in Family settings.'); if(t.dataset.tab==='family'){ ui.macOpen = {}; ui.kidOpen = {}; ui.famShared = false; } if(t.dataset.tab==='groceries' && ui.tab!=='groceries') ui.trip = null; ui.tab = t.dataset.tab==='calendar' && ui.calLast && !CAL_TABS.includes(ui.tab) ? ui.calLast : t.dataset.tab; render(); window.scrollTo(0,0); }
   else if(a==='calview'){ const v = t.dataset.v;
     if(v==='month'){ ui.tab = 'calendar'; const x = pd(ui.sel||TODAY); ui.ym = [x.getFullYear(), x.getMonth()]; }
     else if(v==='week'){ ui.wk = monOf(ui.tab==='calendar' ? TODAY : ui.sel); ui.tab = 'week'; }
@@ -1531,8 +1537,10 @@ document.addEventListener('click', e=>{
   else if(a==='mealnote'){ mealNoteSheet(t.dataset.p, t.dataset.m); }
   else if(a==='notetag'){ const k = t.dataset.k, all = Object.assign({}, S.settings.mealNotes), n = Object.assign({tags:[], note:''}, all[k]); n.tags = n.tags.includes(t.dataset.t) ? n.tags.filter(x=>x!==t.dataset.t) : n.tags.concat(t.dataset.t); all[k] = n; S.settings.mealNotes = all; t.classList.toggle('on'); }
   else if(a==='notesave'){ const k = t.dataset.k, all = Object.assign({}, S.settings.mealNotes), n = Object.assign({tags:[], note:''}, all[k]); n.note = (document.getElementById('note-'+k.replace('|','_')).value||'').trim(); all[k] = n; S.settings.mealNotes = all; changed('Meal notes'); closeSheet(); render(); toast('Saved. Claude plans around it.'); }
-  else if(a==='calmode'){ S.profile = S.profile||{}; const pr = S.profile[t.dataset.p] = S.profile[t.dataset.p]||{goal:'maintain',act:'active'}; pr.mode = t.dataset.v;
+  else if(a==='calmode'){ markMac(t.dataset.p); S.profile = S.profile||{}; const pr = S.profile[t.dataset.p] = S.profile[t.dataset.p]||{goal:'maintain',act:'active'}; pr.mode = t.dataset.v;
     if(pr.mode==='auto' && autoMacros(t.dataset.p)){ changed('Macros'); toast('Targets updated for '+NAMES[t.dataset.p]+'.'); } else save(); render(); }
+  else if(a==='macundo'){ const p = t.dataset.p, sn = (ui.macSnap||{})[p]; if(!sn) return; S.macros[p] = JSON.parse(sn.m); const pr = JSON.parse(sn.pr); S.profile = S.profile||{}; if(pr) S.profile[p] = pr; else delete S.profile[p]; delete ui.macSnap[p]; render(); toast('Changes undone.'); }
+  else if(a==='macsave'){ const p = t.dataset.p; delete (ui.macSnap||{})[p]; changed('Macros'); render(); toast('Saved '+NAMES[p]+'\'s targets.'); }
   else if(a==='pcolor'){ const p = t.dataset.p; if(p!==S.view.me && !KIDS.includes(p)) return; if(colorTaken(p,+t.dataset.i)){ toast('That color is taken.'); return; } S.settings.colors = Object.assign({}, S.settings.colors, {[p]:+t.dataset.i}); changed('Settings'); render(); }
   else if(a==='theme'){ lsSet('mp-theme', t.dataset.v==='auto'?null:t.dataset.v); applyTheme(); render(); }
   else if(a==='weekend'){ S.settings.weekend = t.dataset.v; changed('Settings'); render(); }
@@ -1546,7 +1554,7 @@ document.addEventListener('click', e=>{
   else if(a==='pull'){ const w = shopWeeks()[+t.dataset.i]; pullForward(w); ui.gc = +t.dataset.i; changed('Calendar'); render(); toast(`Shopping moved to ${nice(add(w.start,-1))}. The week's meals shifted a day earlier.`); }
   else if(a==='push'){ const w = shopWeeks()[+t.dataset.i]; pushBack(w); ui.gc = +t.dataset.i; changed('Calendar'); render(); toast(`Shopping moved to ${nice(add(w.start,1))}. The week's meals shifted a day.`); }
   else if(a==='skip'){ S.skipped = S.skipped||{}; const k = t.dataset.date+'|'+t.dataset.key; if(S.skipped[k]) delete S.skipped[k]; else S.skipped[k] = true; changed('Skipped meals'); render(); }
-  else if(a==='goal'){ S.profile = S.profile||{}; const pr = S.profile[t.dataset.p] = S.profile[t.dataset.p]||{wt:'',act:'active'}; pr.goal = t.dataset.v;
+  else if(a==='goal'){ markMac(t.dataset.p); S.profile = S.profile||{}; const pr = S.profile[t.dataset.p] = S.profile[t.dataset.p]||{wt:'',act:'active'}; pr.goal = t.dataset.v;
     if(autoMacros(t.dataset.p)){ changed('Macros'); toast(`Targets updated for ${NAMES[t.dataset.p]}.`); } else { save(); toast('Enter a weight to fill in the targets.'); } render(); }
   else if(a==='compare'){ const T = upcomingTrips(), tr = T.find(x=>x.date===t.dataset.trip); if(!tr) return;
     const items = (ui._picked||[]).filter(r=>r.packs>0).map(r=>({f:r.f.replace(/-mid$/,''), n:r.F.n, pl:r.F.pl, packs:r.packs, cost:r.cost}));
@@ -1599,7 +1607,7 @@ document.addEventListener('change', e=>{
   else if(a==='fzpri'){ S.freezer[+t.dataset.i].priority = t.value; changed('Freezer'); }
   else if(a==='listpick'){ S.checks[t.dataset.key] = t.checked; changed('Groceries'); const sc = window.scrollY; render(); window.scrollTo(0,sc); }
   else if(a==='check'){ S.checks[t.dataset.key] = t.checked; save(); t.closest('.listrow').classList.toggle('done', t.checked); }
-  else if(a==='prof'){ S.profile = S.profile||{}; const pr = S.profile[t.dataset.p] = S.profile[t.dataset.p]||{goal:'maintain',act:'active'}; const f = t.dataset.f, v = parseFloat(t.value);
+  else if(a==='prof'){ markMac(t.dataset.p); S.profile = S.profile||{}; const pr = S.profile[t.dataset.p] = S.profile[t.dataset.p]||{goal:'maintain',act:'active'}; const f = t.dataset.f, v = parseFloat(t.value);
     if(f==='ft' || f==='in'){ const b = bodyOf(t.dataset.p), ft = f==='ft' ? v : Math.floor(b.inches/12), inch = f==='in' ? v : b.inches%12; if(ft>0) pr.ht = Math.round(ft*12 + (inch||0)); }
     else if(f==='age'){ if(v>0) pr.age = Math.round(v); }
     else if(f==='m'){ if(v>0.5 && v<2.6) pr.ht = Math.round(v*100/2.54); }
@@ -1617,6 +1625,7 @@ document.addEventListener('input', e=>{
   const t = e.target, a = t.dataset.act; if(a!=='mac' && a!=='macg') return;
   const p = t.dataset.p, f = t.dataset.f, m = S.macros[p], v = parseFloat(t.value);
   if(!(v>=0)) return;
+  markMac(p);
   const cpg = k => k==='f' ? 9 : 4;
   if(a==='mac'){ m[f] = v; }
   else { m[f] = Math.round(v*cpg(f)/m.kcal*1000)/10; document.getElementById(`m-${p}-${f}`).value = m[f]; }
