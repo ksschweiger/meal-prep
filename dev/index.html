@@ -306,7 +306,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-21dev8';
+const APP_VERSION = '2026-11-21dev9';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -935,7 +935,7 @@ function servingVisual(d,k,G,rows,all,ppl,why){
   // Columns per person so each item reads across; headers are small initial badges to keep it narrow.
   const head = all.map(p=>`<th style="text-align:center">${avatar(p,all)}</th>`).join('');
   const body = rows.map(r=>`<tr><td>${esc(r[0])}</td>${all.map(p=>ppl.includes(p) ? `<td class="amt">${plain(r[1](p))}</td>` : `<td class="amt muted">${why(p)}</td>`).join('')}</tr>`).join('');
-  return `${bars}<table class="stbl"><thead><tr><th></th>${head}</tr></thead><tbody>${body}</tbody></table>`;
+  return `<table class="stbl"><thead><tr><th></th>${head}</tr></thead><tbody>${body}</tbody></table>`;
 }
 // First letter of the name; if two people share it, the first three letters (Kal / Kay).
 function initials(p,all){ const n = NAMES[p], dup = all.some(q=>q!==p && NAMES[q][0]===n[0]); return dup ? n.slice(0,3) : n[0]; }
