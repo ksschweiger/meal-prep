@@ -156,6 +156,9 @@ main{padding-block:14px 110px}
 .stepn{flex:none;width:22px;height:22px;border-radius:50%;background:var(--accent);color:var(--accent-ink);font:700 12px/22px var(--body);text-align:center;margin-top:1px}
 .tapic{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:7px;background:var(--sunk);border:1px solid var(--line);color:#2F7BF6;vertical-align:-7px;margin:0 2px}
 .tapic svg{width:17px;height:17px}
+.cookhelp.pform{display:grid;grid-template-columns:72px 1fr;gap:8px 10px;align-items:center}
+.pflbl{font-weight:700;font-size:13.5px}.pfctl{display:flex;gap:6px;min-width:0}
+.pfin{flex:1 1 0;min-width:0;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:7px 8px;font:inherit;font-size:15px}
 .swatch.taken{opacity:.25;cursor:not-allowed}
 .swatch.on{box-shadow:0 0 0 2px var(--ink)}
 .av{overflow:hidden;display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:30px;padding:0 6px;border-radius:999px;background:var(--pc);color:var(--surface);font:700 12.5px var(--body)}
@@ -325,7 +328,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-21l';
+const APP_VERSION = '2026-11-21m';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -1337,21 +1340,31 @@ const TOL = [['relaxed','Relaxed',15,'Most variety, fewest swaps. Fine for gener
 const tolOf = p => TOL.find(t=>t[0]===((S.settings.tol||{})[p]||'balanced'));
 function tolField(p){ const cur = tolOf(p);
   return `<div class="field" style="margin-top:12px"><span class="lbl">How close to targets</span><div class="seg">${TOL.map(t=>`<button class="${cur[0]===t[0]?'on':''}" data-act="tol" data-p="${p}" data-v="${t[0]}">${t[1]} ±${t[2]}%</button>`).join('')}</div><span class="note">${cur[3]}</span></div>`; }
+// Body details for the calorie math, one labeled row each. Weight is stored in lb and height in inches; units are just for display.
+function profForm(p){
+  const pr = (S.profile||{})[p]||{}, b = bodyOf(p), own = pr.mode==='own', wu = pr.wtUnit||'lb', hu = pr.htUnit||'imp';
+  const wShow = pr.wt ? (wu==='kg' ? Math.round(pr.wt*.4536*10)/10 : pr.wt) : '';
+  const sel = (f, opts, cur, label, narrow) => `<select class="pfin" ${narrow?'style="flex:0 0 92px"':''} data-act="prof" data-p="${p}" data-f="${f}" aria-label="${label}">${opts.map(([v,l])=>`<option value="${v}" ${cur===v?'selected':''}>${l}</option>`).join('')}</select>`;
+  const num = (f, val, label, ph, step) => `<input class="pfin" type="number" inputmode="decimal" step="${step||'any'}" data-act="prof" data-p="${p}" data-f="${f}" value="${val}" placeholder="${ph||''}" aria-label="${label}">`;
+  const row = (label, ctl) => `<span class="pflbl">${label}</span><span class="pfctl">${ctl}</span>`;
+  return `<div class="cookhelp pform" style="margin-top:10px">
+    ${row('Weight', num('wt', wShow, 'Weight', wu==='kg'?'kg':'lb') + sel('wtUnit', [['lb','lb'],['kg','kg']], wu, 'Weight unit', 1))}
+    ${row('Height', sel('htUnit', [['imp','ft / in'],['met','meters']], hu, 'Height unit', 1) + (hu==='met'
+        ? num('m', Math.round(b.inches*2.54)/100, 'Height in meters', '1.80', '0.01')
+        : num('ft', Math.floor(b.inches/12), 'Feet', 'ft', '1') + num('in', b.inches%12, 'Inches', 'in', '1')))}
+    ${row('Age', num('age', b.age, 'Age', '', '1'))}
+    ${row('Sex', sel('sex', [['m','Male'],['f','Female'],['o','Other']], b.sex, 'Sex for calorie math'))}
+    ${row('Activity', sel('act', [['light','Lightly active'],['active','Trains 3–5×/week'],['very','Trains 6+×/week']], pr.act||'active', 'Activity'))}
+    ${row('Goal', sel('goal', [['lose','Lose'],['maintain','Maintain'],['gain','Gain']], pr.goal||'maintain', 'Goal'))}
+    ${row('Calories', `<div class="seg" style="flex:1">${[['auto','Calculate'],['own','Enter my own']].map(([v,l])=>`<button class="${(own?'own':'auto')===v?'on':''}" data-act="calmode" data-p="${p}" data-v="${v}">${l}</button>`).join('')}</div>`)}
+    <span class="note" style="grid-column:1/-1">${own ? 'Type your daily calories in the table below.' : 'Fills in the targets below from these details. You can still change any number afterward.'}${b.sex==='o' ? ' Other uses the midpoint of the male and female formulas.' : ''}</span></div>`;
+}
 function vMacros(){
   const card = p => { const m = S.macros[p], cal = {p:4,c:4,f:4};
     const g = k => Math.round(m.kcal*m[k]/100/(k==='f'?9:4));
     const sum = m.p+m.c+m.f;
     return `<div class="card" style="--pc:${PC[p]}"><div class="row between" data-act="macopen" data-p="${p}" role="button" tabindex="0" aria-expanded="${!!ui.macOpen[p]}" style="cursor:pointer"><div class="pname" style="font-size:18px"><span class="pdot"></span>${NAMES[p]}</div><span class="row" style="gap:8px"><span class="small muted">${m.kcal.toLocaleString()} cal</span><span style="color:var(--accent);font-weight:700;font-size:13px">${ui.macOpen[p]?'Hide':'Show'}</span></span></div><div ${ui.macOpen[p]?'':'hidden'}><div class="row" style="justify-content:flex-end;margin-top:6px"><span class="pill ${sum===100?'thaw':'bad'}" id="sum-${p}">${sum}%</span></div>
-      ${(()=>{ const pr = (S.profile||{})[p]||{wt:'',goal:'maintain',act:'active'};
-        return `<div class="cookhelp" style="margin-top:10px"><div class="row" style="gap:8px;flex-wrap:wrap"><label class="small" for="pw-${p}" style="font-weight:700">Weight</label><input class="numin" id="pw-${p}" inputmode="numeric" data-act="prof" data-p="${p}" data-f="wt" value="${pr.wt}" placeholder="lb" style="width:76px"><span class="unit">lb</span>
-          <select class="numin" id="pa-${p}" data-act="prof" data-p="${p}" data-f="act" style="width:auto;text-align:left;flex:1 1 150px" aria-label="Activity">${[['light','Lightly active'],['active','Trains 3–5×/week'],['very','Trains 6+×/week']].map(([v,l])=>`<option value="${v}" ${pr.act===v?'selected':''}>${l}</option>`).join('')}</select></div>
-          <div class="seg">${[['lose','Lose'],['maintain','Maintain'],['gain','Gain']].map(([v,l])=>`<button class="${pr.goal===v?'on':''}" data-act="goal" data-p="${p}" data-v="${v}">${l}</button>`).join('')}</div>
-          ${(()=>{ const b = bodyOf(p), own = pr.mode==='own'; return `<div class="row" style="gap:8px;flex-wrap:wrap;align-items:center">
-            <label class="small" style="font-weight:700">Height</label><input class="numin" inputmode="numeric" data-act="prof" data-p="${p}" data-f="ft" value="${Math.floor(b.inches/12)}" style="width:52px" aria-label="Feet"><span class="unit">ft</span><input class="numin" inputmode="numeric" data-act="prof" data-p="${p}" data-f="in" value="${b.inches%12}" style="width:52px" aria-label="Inches"><span class="unit">in</span>
-            <label class="small" style="font-weight:700;margin-left:6px">Age</label><input class="numin" inputmode="numeric" data-act="prof" data-p="${p}" data-f="age" value="${b.age}" style="width:56px" aria-label="Age">
-            <select class="numin" data-act="prof" data-p="${p}" data-f="sex" style="width:auto;text-align:left" aria-label="Sex for calorie math">${[['m','Male'],['f','Female']].map(([v,l])=>`<option value="${v}" ${b.sex===v?'selected':''}>${l}</option>`).join('')}</select></div>
-          <div class="seg">${[['auto','Calculate my calories'],['own','I\'ll enter my own']].map(([v,l])=>`<button class="${(own?'own':'auto')===v?'on':''}" data-act="calmode" data-p="${p}" data-v="${v}">${l}</button>`).join('')}</div>
-          <span class="note">${own ? 'Type your daily calories in the table below. Height, age and weight are kept but not used.' : 'Fills in the targets below from your height, age, weight, activity and goal. You can still change any number afterward.'}</span>`; })()}</div>`; })()}
+      ${profForm(p)}
       <table class="mtable" style="margin-top:8px"><tr><th>Daily</th><th>Percent</th><th>Grams</th></tr>
       <tr><td>Calories</td><td colspan="2"><input id="m-${p}-kcal" inputmode="numeric" data-act="mac" data-p="${p}" data-f="kcal" value="${m.kcal}" aria-label="${NAMES[p]} calories"><span class="unit">cal</span></td></tr>
       ${[['p','Protein'],['c','Carbs'],['f','Fat']].map(([k,l])=>`<tr><td>${l}</td><td><input id="m-${p}-${k}" inputmode="decimal" data-act="mac" data-p="${p}" data-f="${k}" value="${m[k]}" aria-label="${NAMES[p]} ${l} percent"><span class="unit">%</span></td><td><input id="m-${p}-${k}g" inputmode="numeric" data-act="macg" data-p="${p}" data-f="${k}" value="${g(k)}" aria-label="${NAMES[p]} ${l} grams"><span class="unit">g</span></td></tr>`).join('')}
@@ -1413,7 +1426,7 @@ function autoMacros(p){
   const pr = (S.profile||{})[p]; if(!pr || !(pr.wt>60) || pr.mode==='own') return false;
   // Mifflin-St Jeor resting burn x activity factor
   const b = bodyOf(p), kg = pr.wt*.4536, cm = b.inches*2.54;
-  const bmr = 10*kg + 6.25*cm - 5*b.age + (b.sex==='m' ? 5 : -161);
+  const bmr = 10*kg + 6.25*cm - 5*b.age + (b.sex==='m' ? 5 : b.sex==='o' ? -78 : -161);
   let kcal = bmr * {light:1.375, active:1.55, very:1.725}[pr.act||'active'];
   kcal *= pr.goal==='lose' ? .82 : pr.goal==='gain' ? 1.1 : 1;
   kcal = Math.round(kcal/25)*25;
@@ -1588,6 +1601,10 @@ document.addEventListener('change', e=>{
   else if(a==='prof'){ S.profile = S.profile||{}; const pr = S.profile[t.dataset.p] = S.profile[t.dataset.p]||{goal:'maintain',act:'active'}; const f = t.dataset.f, v = parseFloat(t.value);
     if(f==='ft' || f==='in'){ const b = bodyOf(t.dataset.p), ft = f==='ft' ? v : Math.floor(b.inches/12), inch = f==='in' ? v : b.inches%12; if(ft>0) pr.ht = Math.round(ft*12 + (inch||0)); }
     else if(f==='age'){ if(v>0) pr.age = Math.round(v); }
+    else if(f==='m'){ if(v>0.5 && v<2.6) pr.ht = Math.round(v*100/2.54); }
+    else if(f==='wt'){ pr.wt = v>0 ? Math.round((pr.wtUnit==='kg' ? v/.4536 : v)*10)/10 : ''; }
+    else if(f==='wtUnit' || f==='htUnit'){ pr[f] = t.value; save(); render(); return; }
+    else if(f==='goal'){ pr.goal = t.value; }
     else pr[f] = f==='wt' ? v||'' : t.value;
     if(autoMacros(t.dataset.p)){ changed('Macros'); render(); toast(`Targets updated for ${NAMES[t.dataset.p]}.`); } else save(); }
   else if(a==='spoz'){ const v = parseFloat(t.value); if(v>0){ S.spices.find(x=>x.id===t.dataset.id).size = v; changed('Seasonings'); } }
