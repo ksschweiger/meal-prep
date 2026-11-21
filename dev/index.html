@@ -133,6 +133,7 @@ main{padding-block:14px 110px}
 .split i:last-child{border-right:0}
 .split i.later{background:repeating-linear-gradient(45deg,var(--sunk),var(--sunk) 5px,var(--surface) 5px,var(--surface) 10px);color:var(--muted)}
 .splitlbl{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:10px}
+.swatch{width:22px;height:22px;border-radius:50%;background:var(--sw);border:2px solid var(--surface);box-shadow:0 0 0 1px var(--line);padding:0;cursor:pointer}.swatch.on{box-shadow:0 0 0 2px var(--ink)}
 .av{display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:30px;padding:0 6px;border-radius:999px;background:var(--pc);color:var(--surface);font:700 12.5px var(--body)}
 .stbl td.amt{font-family:var(--mono);font-size:13px;text-align:center;white-space:nowrap}
 .prow{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-top:1px solid var(--line)}
@@ -300,7 +301,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-20dev2';
+const APP_VERSION = '2026-11-20dev3';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -723,6 +724,7 @@ const calSeg = () => { const v = ui.tab==='calendar' ? 'month' : ui.tab==='week'
 function render(){
   ui._trips = null;
   applyTallow();
+  applyColors();
   document.getElementById('tabs').innerHTML = TABS.map(t=>`<button data-act="tab" data-tab="${t[0]}" class="${ui.tab===t[0] || (t[0]==='calendar' && CAL_TABS.includes(ui.tab))?'on':''}" aria-label="${t[1]}">${t[2]}<span>${t[1]}</span></button>`).join('');
   const v = document.getElementById('view');
   v.style.touchAction = ['week','day','day2'].includes(ui.tab) ? 'pan-y' : '';
@@ -1255,6 +1257,7 @@ function vSettings(){
     <div class="field"><span class="lbl">Prep days</span><div class="chips">${DOW.map((d,i)=>`<button class="chip ${st.prep.includes(i)?'on':''}" data-act="prepday" data-i="${i}">${d}</button>`).join('')}</div></div>
     <div class="field"><span class="lbl">Shopping days (tap to add or remove)</span><div class="chips">${DOW.map((d,i)=>`<button class="chip ${shopDaysOf().includes(i)?'on':''}" data-act="shopday" data-i="${i}">${d}</button>`).join('')}</div></div>
     <div class="field"><span class="lbl">Appearance (this phone)</span><div class="seg">${[['auto','Auto'],['light','Light'],['dark','Dark']].map(([v,l])=>`<button class="${(lsGet('mp-theme')||'auto')===v?'on':''}" data-act="theme" data-v="${v}">${l}</button>`).join('')}</div></div>
+    ${colorsField()}
     <div class="field"><span class="lbl">Seasonal colors</span><div class="seg">${[['on','On'],['off','Off']].map(([v,l])=>`<button class="${(lsGet('mp-season')==='off'?'off':'on')===v?'on':''}" data-act="season" data-v="${v}">${l}</button>`).join('')}</div><span class="note">Fall and Thanksgiving through Thanksgiving Day, then Christmas through the new year.</span></div>
     <div class="field"><span class="lbl">Weekends</span><div class="seg">${[['sun','Sat planned, Sun dinner only'],['light','Dinner only'],['none','Nothing planned'],['full','Full plan']].map(([v,l])=>`<button class="${st.weekend===v?'on':''}" data-act="weekend" data-v="${v}">${l}</button>`).join('')}</div><span class="note">Weekend meals not planned show as Flex, for leftovers.</span></div>
     <div class="field"><div class="row between"><span class="lbl">Most days in a row for one dinner</span><div class="stepper"><button data-act="set" data-k="maxRun" data-d="-1" aria-label="Fewer">−</button><span>${st.maxRun}</span><button data-act="set" data-k="maxRun" data-d="1" aria-label="More">+</button></div></div></div>
@@ -1384,6 +1387,7 @@ document.addEventListener('click', e=>{
   else if(a==='trip'){ ui.trip = +t.dataset.i; render(); }
   else if(a==='gnav'){ ui.gc = Math.max(0, Math.min(shopWeeks().length-1, ui.gc + +t.dataset.dir)); render(); }
   else if(a==='season'){ lsSet('mp-season', t.dataset.v==='off'?'off':null); applyTheme(); render(); }
+  else if(a==='pcolor'){ const p = t.dataset.p; if(p!==S.view.me && !KIDS.includes(p)) return; S.settings.colors = Object.assign({}, S.settings.colors, {[p]:+t.dataset.i}); changed('Settings'); render(); }
   else if(a==='theme'){ lsSet('mp-theme', t.dataset.v==='auto'?null:t.dataset.v); applyTheme(); render(); }
   else if(a==='weekend'){ S.settings.weekend = t.dataset.v; changed('Settings'); render(); }
   else if(a==='shopday'){ const i = +t.dataset.i, cur = shopDaysOf().slice(); const nx = cur.includes(i) ? cur.filter(x=>x!==i) : cur.concat(i).sort(); if(!nx.length) return; S.settings.shopDays = nx; S.settings.shopDay = nx[0]; ui.gc = null; changed('Settings'); render(); toast(`Shopping days: ${nx.map(x=>DOW[x]).join(' and ')}. Each trip covers the meals cooked before the next one.`); }
@@ -1542,6 +1546,22 @@ setInterval(()=>{ if(!S || !TOKEN || document.visibilityState!=='visible') retur
 function thanksgiving(y){ const d = new Date(y,10,1); const first = (11 - d.getDay()) % 7 + 1; return y+'-11-'+pad(first+21); }
 function seasonOf(d){ const tg = thanksgiving(+d.slice(0,4)), md = d.slice(5);
   if(md>='09-15' && d<=tg) return 'fall'; if(d>tg && md<='12-31' && md>='11-01') return 'xmas'; return ''; }
+// Person colors: each adult picks their own; parents pick for the kids. Saved in Settings so every phone matches.
+// Each swatch has a light and a dark shade so it reads in both themes.
+const PALETTE = [['Blue','#3A69A8','#82A8DC'],['Plum','#94467F','#D58DC3'],['Orange','#BC6418','#E9A262'],['Green','#4E8A3C','#83C06F'],['Teal','#2A84A0','#6FC1D8'],['Red','#B4463A','#E57B6F'],['Gold','#9C6A08','#E2B04C'],['Purple','#6A4FB0','#A995E8']];
+const PVAR = {K:'--k',Y:'--y',L:'--l'}, KIDS = ['L'];
+function isDark(){ const v = lsGet('mp-theme'); return v==='dark' || (!v && matchMedia('(prefers-color-scheme: dark)').matches); }
+function applyColors(){
+  const c = (S && S.settings && S.settings.colors) || {}, dark = isDark(), st = document.documentElement.style;
+  Object.keys(PVAR).forEach(p=>{ const sw = PALETTE[c[p]]; if(sw) st.setProperty(PVAR[p], dark ? sw[2] : sw[1]); else st.removeProperty(PVAR[p]); });
+}
+function colorsField(){
+  const c = S.settings.colors || {}, ppl = Object.keys(NAMES);
+  return `<div class="field"><span class="lbl">Colors</span>${ppl.map(p=>{ const mine = p===S.view.me || KIDS.includes(p);
+    return `<div class="row" style="gap:8px;margin:6px 0;align-items:center"><span class="av" style="--pc:${PC[p]}">${initials(p,ppl)}</span><span style="min-width:62px;font-weight:700">${NAMES[p]}</span>${mine
+      ? `<span class="chips" style="gap:5px">${PALETTE.map((sw,i)=>`<button class="swatch ${c[p]===i?'on':''}" style="--sw:${isDark()?sw[2]:sw[1]}" data-act="pcolor" data-p="${p}" data-i="${i}" aria-label="${sw[0]} for ${NAMES[p]}"></button>`).join('')}</span>`
+      : `<span class="note">Set by ${NAMES[p]}</span>`}</div>`; }).join('')}<span class="note">You pick your own color; parents pick for the kids.</span></div>`;
+}
 function applyTheme(){ const se = lsGet('mp-season')==='off' ? '' : seasonOf(ds(new Date())); if(se) document.documentElement.dataset.season = se; else delete document.documentElement.dataset.season;
   const v = lsGet('mp-theme'); if(v) document.documentElement.dataset.theme = v; else delete document.documentElement.dataset.theme;
   const dark = v==='dark' || (!v && matchMedia('(prefers-color-scheme: dark)').matches);
