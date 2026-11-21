@@ -133,6 +133,8 @@ main{padding-block:14px 110px}
 .split i:last-child{border-right:0}
 .split i.later{background:repeating-linear-gradient(45deg,var(--sunk),var(--sunk) 5px,var(--surface) 5px,var(--surface) 10px);color:var(--muted)}
 .splitlbl{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:10px}
+.av{display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:30px;padding:0 6px;border-radius:999px;background:var(--pc);color:var(--surface);font:700 12.5px var(--body)}
+.stbl td.amt{font-family:var(--mono);font-size:13px;text-align:center;white-space:nowrap}
 .prow{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-top:1px solid var(--line)}
 .prow .pn{min-width:78px;font-weight:700;display:flex;align-items:center;gap:6px;color:var(--pc)}
 .prow .pv{flex:1;display:flex;flex-direction:column;gap:3px;font-size:14px}
@@ -298,7 +300,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-20dev1';
+const APP_VERSION = '2026-11-20dev2';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -916,11 +918,13 @@ function servingVisual(d,k,G,rows,all,ppl,why){
       + (later>tot*0.03 ? `<i class="later" style="width:${later/tot*100}%">Later</i>` : '');
     return `<div class="splitlbl"><b style="color:var(--ink)">${esc(g.name)}</b><span>${g.actual?'':'about '}${wt(g.total)} cooked${later>tot*0.03?' · '+wt(later)+' saved for later':''}</span></div><div class="split" role="img" aria-label="How to split the ${esc(g.name)}">${segs}</div>`;
   }).join('');
-  const people = all.map(p=>`<div class="prow" style="--pc:${PC[p]}"><span class="pn"><span class="pdot"></span>${NAMES[p]}</span><span class="pv">${ppl.includes(p)
-      ? rows.map(r=>`<span>${esc(r[0])}<b>${plain(r[1](p))}</b></span>`).join('')
-      : `<span class="muted">${why(p)}</span>`}</span></div>`).join('');
-  return `${bars}<div style="margin-top:10px">${people}</div>`;
+  // Columns per person so each item reads across; headers are small initial badges to keep it narrow.
+  const head = all.map(p=>`<th style="text-align:center"><span class="av" style="--pc:${PC[p]}" title="${NAMES[p]}" aria-label="${NAMES[p]}">${initials(p,all)}</span></th>`).join('');
+  const body = rows.map(r=>`<tr><td>${esc(r[0])}</td>${all.map(p=>ppl.includes(p) ? `<td class="amt">${plain(r[1](p))}</td>` : `<td class="amt muted">${why(p)}</td>`).join('')}</tr>`).join('');
+  return `${bars}<table class="stbl"><thead><tr><th></th>${head}</tr></thead><tbody>${body}</tbody></table>`;
 }
+// First letter of the name; if two people share it, the first three letters (Kal / Kay).
+function initials(p,all){ const n = NAMES[p], dup = all.some(q=>q!==p && NAMES[q][0]===n[0]); return dup ? n.slice(0,3) : n[0]; }
 function vDay2(){
   const d = ui.sel, day = S.plan.days[d];
   const head = `<div class="dayhead"><button class="iconbtn" data-act="dnav" data-dir="-1" aria-label="Previous day">${I.left}</button><h2>${nice(d)}</h2><button class="iconbtn" data-act="dnav" data-dir="1" aria-label="Next day">${I.right}</button></div><div style="text-align:center"><button class="linkbtn" data-act="daylayout" data-v="day">Old day layout ›</button></div>`;
