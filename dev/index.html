@@ -311,7 +311,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-21dev14';
+const APP_VERSION = '2026-11-21dev15';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -510,6 +510,7 @@ function fac(date,p){
 // so a kid's plate is Kayla's dinner scaled to their age band's dinner calories, with a minimum of cooked meat.
 // Kids eat dinner only. Each kid's dinner comes from their age band (about a quarter of the day's calories, USDA
 // estimates for a moderately active child) with a minimum of cooked meat; parents can nudge it up or down.
+const MAX_KIDS = 4;
 const AGE_BANDS = [['1-3','1–3 yrs',300,28],['4-5','4–5 yrs',375,57],['6-8','6–8 yrs',425,57],['9-11','9–11 yrs',500,85],['12-13','12–13 yrs',575,85],['14-17','14–17 yrs',650,113]];
 const ageYears = dob => { if(!dob) return null; const t = pd(TODAY), b = pd(dob); let a = t.getFullYear()-b.getFullYear(); if(t.getMonth()<b.getMonth() || (t.getMonth()===b.getMonth() && t.getDate()<b.getDate())) a--; return a; };
 function kidsList(){ const k = S && S.settings && S.settings.kids; return Array.isArray(k) ? k : [{id:'L', name:'Landen', band:'4-5', adj:(S&&S.settings&&S.settings.landenKcal) ? S.settings.landenKcal-375 : 0}]; }
@@ -1542,7 +1543,7 @@ document.addEventListener('submit', e=>{
     const ex = food!=='other' && S.freezer.find(x=>x.food===food);
     if(ex) ex.lb += lb; else S.freezer.push({item:food==='other'?nm:FOODS[food].n, key:food==='other'?'':food, food:food==='other'?'':food, lb, priority:'Normal', cost:'', notes:''});
     changed('Freezer'); render(); toast(`Added ${lb} lb.`); }
-  if(f==='kid'){ const nm = document.getElementById('kid-name').value.trim(); if(!nm) return; let id = 'C'+Date.now().toString(36).slice(-4).toUpperCase();
+  if(f==='kid'){ const nm = document.getElementById('kid-name').value.trim(); if(!nm) return; if(kidsList().length>=MAX_KIDS){ toast('Up to '+MAX_KIDS+' kids.'); return; } let id = 'C'+Date.now().toString(36).slice(-4).toUpperCase();
     S.settings.kids = kidsList().map(x=>Object.assign({},x)).concat({id, name:nm, band:'4-5'}); changed('Family'); render(); toast('Added '+nm+'. Set their birthday so portions fit.'); }
   if(f==='sp'){ const nm = document.getElementById('sp-name').value.trim(); if(!nm) return; const raw = parseFloat(document.getElementById('sp-size').value)||0, unit = document.getElementById('sp-unit').value, type = document.getElementById('sp-kind').value;
     const qty = Math.max(0, parseFloat(document.getElementById('sp-qty').value)); S.punits = Object.assign({}, S.punits, {[nm.toLowerCase()]:unit}); changed('Pantry units'); clearTimeout(syncT); sync(); const size = Math.round(toOz(raw,unit)*10)/10;
@@ -1644,7 +1645,7 @@ function vFamily(){
         <span class="note">Portions are recommended by age (${b[1]}: about ${b[2]} cal, at least ${wt(b[3])} cooked meat). Use − and + to fit your child's appetite${k.adj?` · you've set ${k.adj>0?'+':''}${k.adj} cal`:''}.</span></div>
       <button class="linkbtn" style="color:var(--bad)" data-act="kidrm" data-p="${k.id}">Remove ${esc(k.name)}</button></div>`; };
   return `<h2 style="font-size:22px">Family settings</h2>` + vMacros().replace('<h2 style="font-size:22px">Daily targets</h2>','<h2 style="font-size:17px;margin-top:10px">Adults · daily targets</h2>').replace(`<p class="note">Kids' dinner portions are in Family settings.</p>`,'') + `<h2 style="font-size:17px;margin-top:18px">Kids</h2>${kidsList().map(kidCard).join('')}
-    <div class="card" style="margin-top:8px"><form class="addform" data-form="kid" style="margin:0"><input id="kid-name" placeholder="Child's name" aria-label="Child's name"><button class="btn primary" type="submit">+ Add child</button></form><span class="note">Kids get the family dinner, portioned for their age.</span></div>`;
+    ${kidsList().length>=MAX_KIDS ? `<p class="note">Households can have up to 2 adults and ${MAX_KIDS} kids.</p>` : `<div class="card" style="margin-top:8px"><form class="addform" data-form="kid" style="margin:0"><input id="kid-name" placeholder="Child's name" aria-label="Child's name"><button class="btn primary" type="submit">+ Add child</button></form><span class="note">Kids get the family dinner, portioned for their age. Up to 2 adults and ${MAX_KIDS} kids.</span></div>`}`;
 }
 function profBlock(p){ const c = S.settings.colors || {}; return `<div class="row" style="gap:14px;align-items:center">${avatar(p,null,true)}<div style="flex:1"><h3 style="font-size:18px">${NAMES[p]}</h3>
       <div class="row" style="gap:8px;margin-top:6px"><label class="btn" for="ph-${p}" style="padding:6px 12px;cursor:pointer">${(S.photos||{})[p]?'Change photo':'Add photo'}</label><input type="file" id="ph-${p}" accept="image/*" data-act="photo" data-p="${p}" hidden>${(S.photos||{})[p]?`<button class="linkbtn" data-act="rmphoto" data-p="${p}">Remove</button>`:''}</div></div></div>
