@@ -270,7 +270,7 @@ details.cmp[open] summary::after{transform:rotate(90deg)}
 </style>
 </head>
 <body>
-<div id="devBanner" style="position:sticky;top:0;z-index:9999;background:#7A2BB5;color:#fff;font:700 13px/1.3 system-ui,sans-serif;text-align:center;padding:6px 10px calc(6px) ;padding-top:max(6px,env(safe-area-inset-top))">DEV VERSION · testing only · uses your real data</div>
+<div id="devBanner" style="background:#7A2BB5;color:#fff;font:700 13px/1.3 system-ui,sans-serif;text-align:center;padding:6px 10px calc(6px) ;padding-top:max(6px,env(safe-area-inset-top))">DEV VERSION · testing only · uses your real data</div>
 
 <div id="app">
   <header class="top"><div class="wrap">
@@ -306,7 +306,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-21dev7';
+const APP_VERSION = '2026-11-21dev8';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -925,10 +925,12 @@ function servingCard(d,k,label){
 function servingVisual(d,k,G,rows,all,ppl,why){
   const plain = v => String(v).replace(/^about /,'');
   const bars = G.list.filter(g=>g.cooks && !g.scoop && !g.each).map(g=>{
-    const today = ppl.reduce((a,p)=>a+g.per[p],0), later = Math.max(0, g.total-today), tot = today+later || 1;
+    // Later = what the remaining days of this batch need (earlier days are already eaten, so they're left out).
+    const later = G.run.filter(x=>x>d && !isFlex(x,k)).reduce((a,x)=>a+eaters(x,k).reduce((b,p)=>b+g.comps.reduce((c2,c)=>c2+raw(x,p,c),0),0),0)*(g.cooks?g.total/g.batchRaw:1);
+    const today = ppl.reduce((a,p)=>a+g.per[p],0), tot = today+later || 1, left = G.run.filter(x=>x>d && !isFlex(x,k)).length;
     const segs = ppl.map(p=>`<i style="--pc:${PC[p]};width:${g.per[p]/tot*100}%" title="${NAMES[p]}: ${plain(fmtPortion(g,p))}"></i>`).join('')
-      + (later>tot*0.03 ? `<i class="later" style="width:${later/tot*100}%">Later</i>` : '');
-    return `<div class="splitlbl"><b style="color:var(--ink)">${esc(g.name)}</b><span>${g.actual?'':'about '}${wt(g.total)} cooked${later>tot*0.03?' · '+wt(later)+' saved for later':''}</span></div><div class="split" role="img" aria-label="How to split the ${esc(g.name)}">${segs}</div>`;
+      + (later>tot*0.03 ? `<i class="later" style="width:${later/tot*100}%">Save</i>` : '');
+    return `<div class="splitlbl"><b style="color:var(--ink)">${esc(g.name)}</b><span>${later>tot*0.03 ? `today ${wt(today)} · save ${wt(later)} for ${left>1?'the last '+left+' days':'the last day'}` : `today ${wt(today)} · finishes it`}</span></div><div class="split" role="img" aria-label="How to split the ${esc(g.name)}">${segs}</div>`;
   }).join('');
   // Columns per person so each item reads across; headers are small initial badges to keep it narrow.
   const head = all.map(p=>`<th style="text-align:center">${avatar(p,all)}</th>`).join('');
