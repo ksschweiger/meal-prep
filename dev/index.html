@@ -136,6 +136,7 @@ main{padding-block:14px 110px}
 .av img{width:100%;height:100%;object-fit:cover;display:block}.av:has(img){padding:0;width:30px}
 .av.big{min-width:64px;width:64px;height:64px;font-size:22px}
 .meav{background:none;border:0;padding:0;margin-left:8px;cursor:pointer;display:flex}
+.pitem{background:none;border:0;padding:0;font:inherit;color:inherit;text-align:left;cursor:pointer}
 .swatch{width:22px;height:22px;border-radius:50%;background:var(--sw);border:2px solid var(--surface);box-shadow:0 0 0 1px var(--line);padding:0;cursor:pointer}.swatch.on{box-shadow:0 0 0 2px var(--ink)}
 .av{overflow:hidden;display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:30px;padding:0 6px;border-radius:999px;background:var(--pc);color:var(--surface);font:700 12.5px var(--body)}
 .stbl td.amt{font-family:var(--mono);font-size:13px;text-align:center;white-space:nowrap}
@@ -305,7 +306,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-20dev4';
+const APP_VERSION = '2026-11-20dev5';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -1217,6 +1218,14 @@ function pantryBuys(ci){
   return adds;
 }
 
+// Pantry sizes are kept in ounces (the sheet's Size column); other units convert, "count" stays a count.
+const PUNITS = ['oz','lb','g','fl oz','count'];
+const toOz = (v,u) => u==='lb' ? v*16 : u==='g' ? v/28.35 : v;
+function pantryEdit(row){ const r = PANTRY.find(x=>x.row===row); if(!r) return;
+  openSheet(`<div class="row between"><h2>${esc(r.item)}</h2><button class="iconbtn" data-act="closeSheet" aria-label="Close">${I.x}</button></div>
+    <div class="field"><label for="pe-size">Container size (oz)</label><input class="textin" id="pe-size" type="number" step="0.1" min="0" value="${r.size||''}"></div>
+    <div class="field"><label for="pe-qty">How many on hand</label><input class="textin" id="pe-qty" type="number" step="0.25" min="0" value="${r.left===null?'':r.left}"><span class="note">Containers. 1 = one full, 2.5 = two full and a half, 0 = out.</span></div>
+    <button class="btn primary block" data-act="psave" data-row="${row}">Save</button>`); }
 function vPantry(){
   const seg = `<div class="seg"><button class="${ui.ptab==='freezer'?'on':''}" data-act="ptab" data-p="freezer">Freezer</button><button class="${ui.ptab==='spices'?'on':''}" data-act="ptab" data-p="spices">Pantry</button></div>`;
   const rcb = `<label class="btn block" for="rcpt-p" style="text-align:center;cursor:pointer">Add a receipt photo (Costco, bulk meat…)</label><input type="file" id="rcpt-p" accept="image/*" data-act="receipt" hidden>`;
@@ -1233,8 +1242,11 @@ function vPantry(){
   return seg + rcb + types.map(t=>{ const rows = PANTRY.filter(r=>(r.type||'Other')===t);
     const low = rows.filter(r=>r.left!==null && r.left<=.25).length;
     return `<details class="card more" ${ui.popen&&ui.popen[t]?'open':''} data-type="${esc(t)}"><summary data-act="popen" data-t="${esc(t)}">${esc(t)} <span class="small muted">· ${rows.length}${low?` · ${low} low`:''}</span></summary>${rows.map(r=>{ const fr = r.left===null?null:r.left, near = fr===null?null:[1,.75,.5,.25,0].reduce((a,v)=>Math.abs(v-Math.min(fr,1))<Math.abs(a-Math.min(fr,1))?v:a,1);
-      return `<div class="listrow" style="flex-wrap:wrap"><span class="grow1" style="min-width:130px">${esc(r.item)}<br><span class="small muted">${r.brand?esc(r.brand)+' · ':''}${r.size} oz${fr!==null&&fr>1.05?` · ${Math.round(fr*10)/10}× on hand`:''}${r.buy==='Never'?' · never bought':''}</span></span><div class="seg mini">${[1,.75,.5,.25,0].map(v=>`<button class="${fr!==null&&fr<=1.05&&near===v?'on '+(v===0?'out':v<=.25?'low':'have'):''}" data-act="sp" data-row="${r.row}" data-v="${v}" aria-label="${esc(r.item)} ${lbl[v]}">${lbl[v]}</button>`).join('')}</div></div>`; }).join('')}</details>`; }).join('') +
-    `<div class="card"><div class="eyebrow">Add an item</div><form class="addform" data-form="sp" style="margin:6px 0 0"><input id="sp-name" placeholder="Name" aria-label="Item name"><input id="sp-size" type="number" step="0.1" min="0" placeholder="oz" aria-label="Size in ounces" style="flex:0 0 72px"><select id="sp-kind" aria-label="Type" style="flex:0 0 150px">${types.map(k=>`<option>${esc(k)}</option>`).join('')}</select><button class="btn primary" type="submit">Add</button></form></div>
+      return `<div class="listrow" style="flex-wrap:wrap"><span class="grow1" style="min-width:130px"><button class="pitem" data-act="pedit" data-row="${r.row}">${esc(r.item)} <span class="small" style="color:var(--accent)">Edit</span></button><br><span class="small muted">${r.brand?esc(r.brand)+' · ':''}${r.size} oz${fr!==null&&fr>1.05?` · ${Math.round(fr*10)/10}× on hand`:''}${r.buy==='Never'?' · never bought':''}</span></span><div class="seg mini">${[1,.75,.5,.25,0].map(v=>`<button class="${fr!==null&&fr<=1.05&&near===v?'on '+(v===0?'out':v<=.25?'low':'have'):''}" data-act="sp" data-row="${r.row}" data-v="${v}" aria-label="${esc(r.item)} ${lbl[v]}">${lbl[v]}</button>`).join('')}</div></div>`; }).join('')}</details>`; }).join('') +
+    `<div class="card"><div class="eyebrow">Add an item</div><form class="addform" data-form="sp" style="margin:6px 0 0;flex-wrap:wrap"><input id="sp-name" placeholder="Name" aria-label="Item name" style="flex:1 1 100%"><select id="sp-kind" aria-label="Type" style="flex:1 1 140px">${types.map(k=>`<option>${esc(k)}</option>`).join('')}</select>
+      <span class="row" style="gap:6px;flex:1 1 100%;align-items:center"><span class="small" style="min-width:100px">Container size</span><input id="sp-size" type="number" step="0.1" min="0" placeholder="16" aria-label="Container size" style="flex:0 0 72px"><select id="sp-unit" aria-label="Unit" style="flex:0 0 84px">${PUNITS.map(u=>`<option>${u}</option>`).join('')}</select></span>
+      <span class="row" style="gap:6px;flex:1 1 100%;align-items:center"><span class="small" style="min-width:100px">How many</span><input id="sp-qty" type="number" step="0.25" min="0" value="1" aria-label="How many containers on hand" style="flex:0 0 72px"><span class="small muted">containers (1.5 = one full + one half)</span></span>
+      <button class="btn primary" type="submit" style="flex:1 1 100%">Add to pantry</button></form></div>
     <p class="note">Tap roughly how much is left. Recipes that need more than you have put it on the grocery list; close calls show under Check before you shop. You can also edit the Pantry tab in the Google Sheet.</p>`;
 }
 
@@ -1392,6 +1404,12 @@ document.addEventListener('click', e=>{
   else if(a==='gnav'){ ui.gc = Math.max(0, Math.min(shopWeeks().length-1, ui.gc + +t.dataset.dir)); render(); }
   else if(a==='season'){ lsSet('mp-season', t.dataset.v==='off'?'off':null); applyTheme(); render(); }
   else if(a==='rmphoto'){ const p = t.dataset.p; if(p!==S.view.me && !KIDS.includes(p)) return; S.photos = Object.assign({}, S.photos); delete S.photos[p]; changed('Profile'); render(); }
+  else if(a==='pedit'){ pantryEdit(+t.dataset.row); }
+  else if(a==='psave'){ const r = PANTRY.find(x=>x.row===+t.dataset.row); if(!r) return;
+    const size = parseFloat(document.getElementById('pe-size').value), left = parseFloat(document.getElementById('pe-qty').value), up = {row:r.row};
+    if(!isNaN(size) && size>=0){ r.size = size; up.size = size; } if(!isNaN(left) && left>=0){ r.left = left; up.left = left; PSNAP[r.row] = left; }
+    closeSheet(); rebuildSpices(); render(); setSync('Saving…');
+    api('pantry', {updates:[up]}).then(()=>{ setSync('Saved'); toast('Updated '+r.item+'.'); }).catch(e=>{ setSync('Not saved'); toast('Could not save: '+e.message); }); }
   else if(a==='pcolor'){ const p = t.dataset.p; if(p!==S.view.me && !KIDS.includes(p)) return; S.settings.colors = Object.assign({}, S.settings.colors, {[p]:+t.dataset.i}); changed('Settings'); render(); }
   else if(a==='theme'){ lsSet('mp-theme', t.dataset.v==='auto'?null:t.dataset.v); applyTheme(); render(); }
   else if(a==='weekend'){ S.settings.weekend = t.dataset.v; changed('Settings'); render(); }
@@ -1482,8 +1500,9 @@ document.addEventListener('submit', e=>{
     const ex = food!=='other' && S.freezer.find(x=>x.food===food);
     if(ex) ex.lb += lb; else S.freezer.push({item:food==='other'?nm:FOODS[food].n, key:food==='other'?'':food, food:food==='other'?'':food, lb, priority:'Normal', cost:'', notes:''});
     changed('Freezer'); render(); toast(`Added ${lb} lb.`); }
-  if(f==='sp'){ const nm = document.getElementById('sp-name').value.trim(); if(!nm) return; const size = parseFloat(document.getElementById('sp-size').value)||0, type = document.getElementById('sp-kind').value;
-    api('pantry', {adds:[{item:nm, type, size, left:1, notes:'Added in the app'}]}).then(()=>boot()).then(()=>toast(`Added ${nm}. Claude will link it to recipes on the next check.`)).catch(err=>toast('Could not add: '+err.message)); }
+  if(f==='sp'){ const nm = document.getElementById('sp-name').value.trim(); if(!nm) return; const raw = parseFloat(document.getElementById('sp-size').value)||0, unit = document.getElementById('sp-unit').value, type = document.getElementById('sp-kind').value;
+    const qty = Math.max(0, parseFloat(document.getElementById('sp-qty').value)); const size = Math.round(toOz(raw,unit)*10)/10;
+    api('pantry', {adds:[{item:nm, type, size, left:isNaN(qty)?1:qty, notes:'Added in the app'+(unit==='oz'?'':` · ${raw} ${unit}`)}]}).then(()=>boot()).then(()=>toast(`Added ${nm}. Claude will link it to recipes on the next check.`)).catch(err=>toast('Could not add: '+err.message)); }
 });
 
 // Shrink a phone photo before upload so it travels fast.
