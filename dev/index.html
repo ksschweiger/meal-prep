@@ -135,6 +135,11 @@ main{padding-block:14px 110px}
 .splitlbl{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:10px}
 .av img{width:100%;height:100%;object-fit:cover;display:block}.av:has(img){padding:0;width:30px}
 .av.big{min-width:64px;width:64px;height:64px;font-size:22px}
+.top .wrap{position:relative}
+.mescrim{position:fixed;inset:0;z-index:20}
+.mepop{position:absolute;right:max(16px,env(safe-area-inset-right,0px));top:calc(100% + 4px);z-index:21;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--pop);min-width:250px;padding:6px;display:flex;flex-direction:column}
+.mepop button{background:none;border:0;text-align:left;padding:10px 12px;border-radius:10px;color:inherit;font:inherit;display:flex;flex-direction:column;gap:2px;cursor:pointer}
+.mepop button.on,.mepop button:active{background:var(--sunk)}
 .meav{background:none;border:0;padding:0;margin-left:8px;cursor:pointer;display:flex}
 .pitem{background:none;border:0;padding:0;font:inherit;color:inherit;text-align:left;cursor:pointer}
 .swatch{width:22px;height:22px;border-radius:50%;background:var(--sw);border:2px solid var(--surface);box-shadow:0 0 0 1px var(--line);padding:0;cursor:pointer}.swatch.on{box-shadow:0 0 0 2px var(--ink)}
@@ -276,7 +281,7 @@ details.cmp[open] summary::after{transform:rotate(90deg)}
   <header class="top"><div class="wrap">
     <span class="brand">Meal Prep</span><span class="sync" id="sync"></span>
     <button class="reqbtn" data-act="openReq" aria-label="Send a request to Claude"><span class="dot" id="reqdot" hidden></span>Request</button>
-    <button class="meav" id="meav" data-act="tab" data-tab="profile" aria-label="My profile"></button>
+    <button class="meav" id="meav" data-act="memenu" aria-label="Menu" aria-haspopup="true"></button><div id="mepop" hidden></div>
   </div></header>
   <main><div class="wrap" id="view"></div></main>
   <nav class="tabs"><div class="wrap" id="tabs"></div></nav>
@@ -306,7 +311,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-21dev9';
+const APP_VERSION = '2026-11-21dev10';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -725,7 +730,7 @@ const fmtTime = iso => { const d = new Date(iso); return nice(ds(d))+', '+d.toLo
 
 // ---------- Views ----------
 // Day isn't in the tab bar: open a day from the calendar.
-const TABS = [['calendar','Calendar',I.cal],['groceries','Groceries',I.cart],['stats','Stats',I.chart],['pantry','Pantry',I.jar],['macros','Macros',I.gauge],['settings','Settings',I.gear]];
+const TABS = [['calendar','Calendar',I.cal],['groceries','Groceries',I.cart],['stats','Stats',I.chart],['pantry','Pantry',I.jar],['macros','Macros',I.gauge]];
 // Calendar tab has three views picked at the top: Month, Week, Day (the day page uses whichever layout was last chosen).
 const CAL_TABS = ['calendar','week','day','day2'];
 const calSeg = () => { const v = ui.tab==='calendar' ? 'month' : ui.tab==='week' ? 'week' : 'day';
@@ -735,11 +740,12 @@ function render(){
   applyTallow();
   applyColors();
   const me = document.getElementById('meav'); if(me) me.innerHTML = avatar(S.view.me);
+  const pop = document.getElementById('mepop'); if(pop){ pop.hidden = !ui.menu; pop.innerHTML = ui.menu ? `<div class="mescrim" data-act="memenu"></div><div class="mepop" role="menu">${[['profile','Personal settings','Photo, color, units, this phone'],['settings','Meal prep settings','Shopping, prep days, budget, store'],['family','Family settings','Kids and household members']].map(([t,l,sub])=>`<button role="menuitem" class="${ui.tab===t?'on':''}" data-act="tab" data-tab="${t}"><b>${l}</b><span class="small muted">${sub}</span></button>`).join('')}</div>` : ''; }
   document.getElementById('tabs').innerHTML = TABS.map(t=>`<button data-act="tab" data-tab="${t[0]}" class="${ui.tab===t[0] || (t[0]==='calendar' && CAL_TABS.includes(ui.tab))?'on':''}" aria-label="${t[1]}">${t[2]}<span>${t[1]}</span></button>`).join('');
   const v = document.getElementById('view');
   v.style.touchAction = ['week','day','day2'].includes(ui.tab) ? 'pan-y' : '';
   if(CAL_TABS.includes(ui.tab)) ui.calLast = ui.tab;
-  v.innerHTML = (CAL_TABS.includes(ui.tab) ? calSeg() : '')+'<div class="view">'+({calendar:vCalendar,week:vWeek,day2:vDay2,day:vDay,stats:vStats,groceries:vGroceries,pantry:vPantry,macros:vMacros,settings:vSettings,profile:vProfile}[ui.tab])()+'</div>';
+  v.innerHTML = (CAL_TABS.includes(ui.tab) ? calSeg() : '')+'<div class="view">'+({calendar:vCalendar,week:vWeek,day2:vDay2,day:vDay,stats:vStats,groceries:vGroceries,pantry:vPantry,macros:vMacros,settings:vSettings,profile:vProfile,family:vFamily}[ui.tab])()+'</div>';
   updateDot();
 }
 
@@ -1280,7 +1286,7 @@ function vMacros(){
 
 function vSettings(){
   const st = S.settings, f = S.flag;
-  return `<h2 style="font-size:22px">Settings</h2><div class="card">
+  return `<h2 style="font-size:22px">Meal prep settings</h2><p class="note" style="margin:-4px 0 8px">Shared by the whole household.</p><div class="card">
     <div class="field"><span class="lbl">Prep days</span><div class="chips">${DOW.map((d,i)=>`<button class="chip ${st.prep.includes(i)?'on':''}" data-act="prepday" data-i="${i}">${d}</button>`).join('')}</div></div>
     <div class="field"><span class="lbl">Shopping days (tap to add or remove)</span><div class="chips">${DOW.map((d,i)=>`<button class="chip ${shopDaysOf().includes(i)?'on':''}" data-act="shopday" data-i="${i}">${d}</button>`).join('')}</div></div>
     <div class="field"><span class="lbl">Weekends</span><div class="seg">${[['sun','Sat planned, Sun dinner only'],['light','Dinner only'],['none','Nothing planned'],['full','Full plan']].map(([v,l])=>`<button class="${st.weekend===v?'on':''}" data-act="weekend" data-v="${v}">${l}</button>`).join('')}</div><span class="note">Weekend meals not planned show as Flex, for leftovers.</span></div>
@@ -1387,7 +1393,8 @@ document.addEventListener('click', e=>{
   const a = t.dataset.act;
   if(a==='closeSheet'){ if(e.target===t || t.tagName==='BUTTON') closeSheet(); return; }
   if(['cooked','mac','macg','budget','store','check','drinkon','prof','spoz','receipt','fzpri'].includes(a)) return;
-  if(a==='tab'){ if(t.dataset.tab==='groceries' && ui.tab!=='groceries') ui.trip = null; ui.tab = t.dataset.tab==='calendar' && ui.calLast && !CAL_TABS.includes(ui.tab) ? ui.calLast : t.dataset.tab; render(); window.scrollTo(0,0); }
+  if(a==='memenu'){ ui.menu = !ui.menu; render(); return; }
+  if(a==='tab'){ ui.menu = false; if(t.dataset.tab==='groceries' && ui.tab!=='groceries') ui.trip = null; ui.tab = t.dataset.tab==='calendar' && ui.calLast && !CAL_TABS.includes(ui.tab) ? ui.calLast : t.dataset.tab; render(); window.scrollTo(0,0); }
   else if(a==='calview'){ const v = t.dataset.v;
     if(v==='month'){ ui.tab = 'calendar'; const x = pd(ui.sel||TODAY); ui.ym = [x.getFullYear(), x.getMonth()]; }
     else if(v==='week'){ ui.wk = monOf(ui.tab==='calendar' ? TODAY : ui.sel); ui.tab = 'week'; }
@@ -1595,21 +1602,25 @@ function applyColors(){
 function avatar(p,all,big){ const ph = (S.photos||{})[p], ppl = all || Object.keys(NAMES);
   return `<span class="av${big?' big':''}" style="--pc:${PC[p]}" title="${NAMES[p]}" aria-label="${NAMES[p]}">${ph?`<img src="${ph}" alt="">`:initials(p,ppl)}</span>`; }
 // My profile: your own photo and color, plus the kids' if you're a parent. Other adults' profiles aren't shown.
-function vProfile(){
-  const me = S.view.me, c = S.settings.colors || {};
-  const block = p => `<div class="row" style="gap:14px;align-items:center">${avatar(p,null,true)}<div style="flex:1"><h3 style="font-size:18px">${NAMES[p]}</h3>
+function vProfile(){ return vProfileBody(S.view.me); }
+// Family settings: kids' photos and colors (parents set these). Adding household members comes with the household setup step.
+function vFamily(){ const kids = KIDS.filter(p=>NAMES[p]);
+  return `<h2 style="font-size:22px">Family settings</h2>` + (KIDS.includes(S.view.me) ? '<div class="card muted">Parents manage family settings.</div>'
+    : kids.map(p=>`<div class="card" style="margin-top:8px">${profBlock(p)}</div>`).join('') + `<p class="note">Adding and removing family members is coming next.</p>`);
+}
+function profBlock(p){ const c = S.settings.colors || {}; return `<div class="row" style="gap:14px;align-items:center">${avatar(p,null,true)}<div style="flex:1"><h3 style="font-size:18px">${NAMES[p]}</h3>
       <div class="row" style="gap:8px;margin-top:6px"><label class="btn" for="ph-${p}" style="padding:6px 12px;cursor:pointer">${(S.photos||{})[p]?'Change photo':'Add photo'}</label><input type="file" id="ph-${p}" accept="image/*" data-act="photo" data-p="${p}" hidden>${(S.photos||{})[p]?`<button class="linkbtn" data-act="rmphoto" data-p="${p}">Remove</button>`:''}</div></div></div>
     ${p===S.view.me?`<div class="field" style="margin-top:12px"><span class="lbl">Weigh in</span><div class="seg">${[['g','Grams'],['oz','Ounces']].map(([v,l])=>`<button class="${WU()===v?'on':''}" data-act="wunit" data-v="${v}">${l}</button>`).join('')}</div><span class="note">Servings, cooked weights and pantry sizes show in this unit. Rice stays in cups.</span></div>`:''}
-    <div class="field" style="margin-top:12px"><span class="lbl">Color</span><span class="chips" style="gap:8px">${PALETTE.map((sw,i)=>`<button class="swatch ${c[p]===i?'on':''}" style="--sw:${isDark()?sw[2]:sw[1]}" data-act="pcolor" data-p="${p}" data-i="${i}" aria-label="${sw[0]}"></button>`).join('')}</span></div>`;
-  const kids = KIDS.includes(me) ? [] : KIDS.filter(p=>NAMES[p]);
-  return `<h2 style="font-size:22px">My profile</h2><div class="card">${block(me)}</div>
+    <div class="field" style="margin-top:12px"><span class="lbl">Color</span><span class="chips" style="gap:8px">${PALETTE.map((sw,i)=>`<button class="swatch ${c[p]===i?'on':''}" style="--sw:${isDark()?sw[2]:sw[1]}" data-act="pcolor" data-p="${p}" data-i="${i}" aria-label="${sw[0]}"></button>`).join('')}</span></div>`; }
+function vProfileBody(me){ const block = profBlock;
+  return `<h2 style="font-size:22px">Personal settings</h2><div class="card">${block(me)}</div>
     <h2 style="font-size:17px;margin-top:18px">This phone</h2><div class="card">
     <div class="field"><span class="lbl">Appearance</span><div class="seg">${[['auto','Auto'],['light','Light'],['dark','Dark']].map(([v,l])=>`<button class="${(lsGet('mp-theme')||'auto')===v?'on':''}" data-act="theme" data-v="${v}">${l}</button>`).join('')}</div></div>
     <div class="field"><span class="lbl">Seasonal colors</span><div class="seg">${[['on','On'],['off','Off']].map(([v,l])=>`<button class="${(lsGet('mp-season')==='off'?'off':'on')===v?'on':''}" data-act="season" data-v="${v}">${l}</button>`).join('')}</div><span class="note">Fall and Thanksgiving through Thanksgiving Day, then Christmas through the new year.</span></div>
     <div class="field"><span class="lbl">Day page</span><div class="seg">${[['day2','New layout'],['day','Old layout']].map(([v,l])=>`<button class="${(lsGet('mp-daylayout')||'day2')===v?'on':''}" data-act="phonelayout" data-v="${v}">${l}</button>`).join('')}</div></div>
     <span class="note">These only change this phone.</span></div>`
     + `<div style="margin-top:8px"><div class="card"><div class="row between"><div><b>${esc(USER.name)}</b><div class="small muted">${esc(USER.email)}</div></div><button class="btn" data-act="signout">Sign out</button></div></div></div>`
-    + (kids.length ? `<h2 style="font-size:17px;margin-top:18px">Kids</h2>${kids.map(p=>`<div class="card" style="margin-top:8px">${block(p)}</div>`).join('')}` : '');
+    ;
 }
 // Center-crop a photo to a 160px square JPEG (a few KB) so it fits in the sheet.
 function squarePhoto(file){ return new Promise((ok,no)=>{ const r = new FileReader(); r.onerror = no; r.onload = ()=>{ const im = new Image(); im.onerror = no; im.onload = ()=>{
