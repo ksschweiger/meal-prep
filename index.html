@@ -313,7 +313,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-21d';
+const APP_VERSION = '2026-11-21e';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -1679,7 +1679,7 @@ function vFamily(){
     const head = famHead('kidopen', `data-p="${k.id}"`, open, `<div class="pname" style="font-size:18px;--pc:${PC[k.id]};gap:8px">${avatar(k.id)}${esc(k.name)}</div>`, `${a===null?b[1]:'Age '+a} · ${kidDaily(k.id).toLocaleString()} cal`);
     if(!open) return `<div class="card" style="margin-top:8px">${head}</div>`;
     return `<div class="card" style="margin-top:8px">${head}<div style="margin-top:12px">${profBlock(k.id)}</div>
-      <div class="field" style="margin-top:12px"><label for="kd-${k.id}">Birthday</label><input class="textin" type="date" id="kd-${k.id}" data-act="kiddob" data-p="${k.id}" value="${k.dob||''}"><span class="note">${a===null?'Add a birthday so portions grow with them. Until then: '+b[1]+'.':'Age '+a+' · '+b[1]+' portions. Moves up automatically on their birthday.'}</span></div>
+      <div class="field" style="margin-top:12px"><label for="kd-${k.id}">Birthday</label><input class="textin" type="date" style="display:block;width:100%;max-width:100%;min-width:0;box-sizing:border-box;-webkit-appearance:none;appearance:none;text-align:left" id="kd-${k.id}" data-act="kiddob" data-p="${k.id}" value="${k.dob||''}"><span class="note">${a===null?'Add a birthday so portions grow with them. Until then: '+b[1]+'.':'Age '+a+' · '+b[1]+' portions. Moves up automatically on their birthday.'}</span></div>
       ${k.dob?'':`<div class="field"><span class="lbl">Age</span><div class="chips">${AGE_BANDS.map(x=>`<button class="chip ${b[0]===x[0]?'on':''}" data-act="kidband" data-p="${k.id}" data-v="${x[0]}">${x[1]}</button>`).join('')}</div></div>`}
       <div class="field"><div class="row between"><span class="lbl">Daily calories</span><div class="stepper"><button data-act="kidday" data-p="${k.id}" data-d="-50" aria-label="Less">−</button><span>${kidDaily(k.id).toLocaleString()}</span><button data-act="kidday" data-p="${k.id}" data-d="50" aria-label="More">+</button></div></div>
         <span class="note">Recommended by age (${b[1]}: about ${b[2].toLocaleString()} cal a day). Each meal they share is a third: about ${kidKcal(k.id)} cal${kidMeat(k.id)?`, with at least ${wt(kidMeat(k.id))} cooked meat at dinner`:''}. Use − and + to fit your child's appetite.</span></div>
