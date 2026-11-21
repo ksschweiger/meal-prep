@@ -319,7 +319,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-21i';
+const APP_VERSION = '2026-11-21j';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -783,7 +783,7 @@ function render(){
   syncKids(); syncMeals();
   applyColors();
   const me = document.getElementById('meav'); if(me) me.innerHTML = avatar(S.view.me);
-  const pop = document.getElementById('mepop'); if(pop){ pop.hidden = !ui.menu; pop.innerHTML = ui.menu ? `<div class="mescrim" data-act="memenu"></div><div class="mepop" role="menu">${[['profile','Personal settings','Photo, color, units, this phone'],['settings','Meal prep settings','Shopping, prep days, budget, store'],['family','Family settings','Macros, kids and their portions']].map(([t,l,sub])=>`<button role="menuitem" class="${ui.tab===t?'on':''}" data-act="tab" data-tab="${t}"><b>${l}</b><span class="small muted">${sub}</span></button>`).join('')}<button role="menuitem" data-act="whatsnew"><b>What's new</b><span class="small muted">Latest changes to the app</span></button></div>` : ''; }
+  const pop = document.getElementById('mepop'); if(pop){ pop.hidden = !ui.menu; pop.innerHTML = ui.menu ? `<div class="mescrim" data-act="memenu"></div><div class="mepop" role="menu">${[['profile','Personal settings','Photo, color, units, this phone'],['settings','Meal prep settings','Shopping, prep days, budget, store'],['family','Family settings','Macros, kids and their portions']].map(([t,l,sub])=>`<button role="menuitem" class="${ui.tab===t?'on':''}" data-act="tab" data-tab="${t}"><b>${l}</b><span class="small muted">${sub}</span></button>`).join('')}<button role="menuitem" data-act="whatsnew"><b>What's new</b><span class="small muted">Latest changes to the app</span></button>${isStandalone()?'':`<button role="menuitem" data-act="install"><b>Add to Home Screen</b><span class="small muted">Open it like an app, with its own icon</span></button>`}</div>` : ''; }
   document.getElementById('tabs').innerHTML = TABS.map(t=>`<button data-act="tab" data-tab="${t[0]}" class="${ui.tab===t[0] || (t[0]==='calendar' && CAL_TABS.includes(ui.tab))?'on':''}" aria-label="${t[1]}">${t[2]}<span>${t[1]}</span></button>`).join('');
   const v = document.getElementById('view');
   v.style.touchAction = ['week','day','day2'].includes(ui.tab) ? 'pan-y' : '';
@@ -1494,6 +1494,7 @@ document.addEventListener('click', e=>{
   else if(a==='kidrm'){ const x = kidOf(t.dataset.p); if(!x || !confirmRm(x)) return; S.settings.kids = kidsList().filter(y=>y.id!==x.id); changed('Family'); render(); toast(x.name+' removed. Dinners rescale for everyone else.'); }
   else if(a==='tol'){ S.settings.tol = Object.assign({}, S.settings.tol, {[t.dataset.p]:t.dataset.v}); changed('Macros'); render(); }
   else if(a==='seenNew'){ S.seen = Object.assign({}, S.seen, {[seenKey()]:RELEASES[0].v}); save(); closeSheet(); }
+  else if(a==='install'){ ui.menu = false; render(); showInstall(); }
   else if(a==='whatsnew'){ ui.menu = false; render(); showWhatsNew(true); }
   else if(a==='famshared'){ ui.famShared = !ui.famShared; render(); }
   else if(a==='shared'){ S.settings.shared = Object.assign({}, SHARED(), {[t.dataset.k]:t.dataset.v==='1'}); changed('Shared meals'); render(); }
@@ -1776,6 +1777,24 @@ function showWhatsNew(force){
   openSheet(`<div class="row between"><h2>${esc(r.title)}</h2><button class="iconbtn" data-act="seenNew" aria-label="Close">${I.x}</button></div>
     <ul style="margin:8px 0 14px;padding-left:20px;display:flex;flex-direction:column;gap:8px;font-size:15px">${r.items.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
     <button class="btn primary block" data-act="seenNew">Got it</button>`);
+}
+// ---------- Add to Home Screen ----------
+// Android/desktop Chrome can install directly; iPhone has no install button for websites, so show the steps for the browser in use.
+let installEvt = null; window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); installEvt = e; });
+const isStandalone = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+function showInstall(){
+  if(installEvt){ installEvt.prompt(); installEvt.userChoice.finally(()=>{ installEvt = null; }); return; }
+  const ua = navigator.userAgent||'', ios = /iPhone|iPad|iPod/.test(ua), chromeIOS = /CriOS/.test(ua);
+  const steps = ios ? [
+      chromeIOS ? 'Tap the Share icon next to the address bar (square with an arrow).' : 'Tap the Share button (square with an arrow) at the bottom of the screen or next to the address bar.',
+      'Scroll down and tap Add to Home Screen. Not there? Tap Edit Actions at the bottom and add it.',
+      'Tap Add. A stove icon appears on your Home Screen.',
+      'Open the app from that icon and sign in once.']
+    : ['Open your browser menu (⋮).', 'Tap Install app or Add to Home screen.', 'Open it from the new icon and sign in once.'];
+  openSheet(`<div class="row between"><h2>Add to Home Screen</h2><button class="iconbtn" data-act="closeSheet" aria-label="Close">${I.x}</button></div>
+    <ol style="margin:8px 0 14px;padding-left:22px;display:flex;flex-direction:column;gap:8px;font-size:15px">${steps.map(x=>`<li>${esc(x)}</li>`).join('')}</ol>
+    <p class="note">iPhone doesn't let websites add themselves, so this takes a few taps in the Share menu. It works from Safari or Chrome.</p>
+    <button class="btn primary block" data-act="closeSheet">Got it</button>`);
 }
 function applyTheme(){ const se = lsGet('mp-season')==='off' ? '' : seasonOf(ds(new Date())); if(se) document.documentElement.dataset.season = se; else delete document.documentElement.dataset.season;
   const v = lsGet('mp-theme'); if(v) document.documentElement.dataset.theme = v; else delete document.documentElement.dataset.theme;
