@@ -312,7 +312,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-21dev20';
+const APP_VERSION = '2026-11-21dev21';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -1412,7 +1412,7 @@ document.addEventListener('click', e=>{
   if(a==='closeSheet'){ if(e.target===t || t.tagName==='BUTTON') closeSheet(); return; }
   if(['cooked','mac','macg','budget','store','check','drinkon','prof','spoz','receipt','fzpri'].includes(a)) return;
   if(a==='memenu'){ ui.menu = !ui.menu; render(); return; }
-  if(a==='tab'){ ui.menu = false; if(t.dataset.tab==='groceries' && ui.tab!=='groceries') ui.trip = null; ui.tab = t.dataset.tab==='calendar' && ui.calLast && !CAL_TABS.includes(ui.tab) ? ui.calLast : t.dataset.tab; render(); window.scrollTo(0,0); }
+  if(a==='tab'){ ui.menu = false; if(t.dataset.tab==='family'){ ui.macOpen = {}; ui.kidOpen = {}; ui.famShared = false; } if(t.dataset.tab==='groceries' && ui.tab!=='groceries') ui.trip = null; ui.tab = t.dataset.tab==='calendar' && ui.calLast && !CAL_TABS.includes(ui.tab) ? ui.calLast : t.dataset.tab; render(); window.scrollTo(0,0); }
   else if(a==='calview'){ const v = t.dataset.v;
     if(v==='month'){ ui.tab = 'calendar'; const x = pd(ui.sel||TODAY); ui.ym = [x.getFullYear(), x.getMonth()]; }
     else if(v==='week'){ ui.wk = monOf(ui.tab==='calendar' ? TODAY : ui.sel); ui.tab = 'week'; }
@@ -1501,9 +1501,11 @@ document.addEventListener('click', e=>{
   else if(a==='copylist'){ const txt = document.getElementById('cart-text').value; (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(()=>toast('List copied.')).catch(()=>{ const el = document.getElementById('cart-text'); el.focus(); el.select(); toast('Selected. Use Copy from your phone menu.'); }); }
 });
 
+// Birthday picker: wait until it closes before redrawing, so changing the month doesn't close it.
+document.addEventListener('focusout', e=>{ if(e.target.dataset && e.target.dataset.act==='kiddob' && ui.dobDirty){ ui.dobDirty = false; setTimeout(render, 50); } });
 document.addEventListener('change', e=>{
   const t = e.target, a = t.dataset.act;
-  if(a==='kiddob'){ const k = kidsList().map(x=>Object.assign({},x)); const x = k.find(y=>y.id===t.dataset.p); if(!x) return; x.dob = t.value || ''; S.settings.kids = k; changed('Family'); render(); return; }
+  if(a==='kiddob'){ const k = kidsList().map(x=>Object.assign({},x)); const x = k.find(y=>y.id===t.dataset.p); if(!x) return; x.dob = t.value || ''; S.settings.kids = k; changed('Family'); ui.dobDirty = true; return; }
   if(a==='cooked'){ const v = parseFloat(t.value)*(WU()==='oz'?28.35:1); S.cooked[t.dataset.run] = S.cooked[t.dataset.run]||{}; if(v>0) S.cooked[t.dataset.run][t.dataset.grp] = v; else delete S.cooked[t.dataset.run][t.dataset.grp]; changed('Cooked weights'); const sc = window.scrollY; render(); window.scrollTo(0,sc); toast('Portions updated from the cooked weight.'); }
   else if(a==='drinkon'){ S.drinkOn = S.drinkOn||{}; S.drinkOn[t.dataset.date] = t.checked; changed('Drinks'); const id = S.plan.days[t.dataset.date].d; render(); if(t.checked) showDrink(id); }
   else if(a==='photo'){ const f = t.files && t.files[0], p = t.dataset.p; t.value = ''; if(!f || (p!==S.view.me && !KIDS.includes(p))) return;
