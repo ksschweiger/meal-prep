@@ -998,7 +998,7 @@ function vDay2(){
       return `<button class="slothead" data-act="slotopen" data-k="${esc(sk)}" aria-expanded="${open}"><span class="grow1"><b>${label}</b><br><span class="small muted">${esc(names)}</span></span><span class="chev" style="${open?'transform:rotate(90deg)':''}">›</span></button>${open?`<div class="slotbody">${items}</div>`:''}`; }).join('');
     return `<section class="slot psec" style="--pc:${PC[p]}"><h2 class="pname"><span class="pdot"></span>${NAMES[p]}</h2>${parts}</section>`; };
   // Both of us: just the shared meals as serving tables. Just me: my own section.
-  if(S.view.mode==='both') return head + seg + lockb + wk + banners + mac + (SHARED().b ? servingCard(d,'b','Breakfast') : '') + (SHARED().l ? servingCard(d,'l','Lunch') : '') + servingCard(d,'d','Dinner');
+  if(S.view.mode==='both') return head + seg + lockb + wk + banners + mac + (MEALS[day.b] ? servingCard(d,'b','Breakfast') : '') + (SHARED().l || MEALS[day.l] ? servingCard(d,'l','Lunch') : '') + servingCard(d,'d','Dinner');
   return head + seg + lockb + wk + banners + mac + ppl.map(section).join('');
 }
 
