@@ -325,7 +325,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-21k';
+const APP_VERSION = '2026-11-21l';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -1346,7 +1346,12 @@ function vMacros(){
         return `<div class="cookhelp" style="margin-top:10px"><div class="row" style="gap:8px;flex-wrap:wrap"><label class="small" for="pw-${p}" style="font-weight:700">Weight</label><input class="numin" id="pw-${p}" inputmode="numeric" data-act="prof" data-p="${p}" data-f="wt" value="${pr.wt}" placeholder="lb" style="width:76px"><span class="unit">lb</span>
           <select class="numin" id="pa-${p}" data-act="prof" data-p="${p}" data-f="act" style="width:auto;text-align:left;flex:1 1 150px" aria-label="Activity">${[['light','Lightly active'],['active','Trains 3–5×/week'],['very','Trains 6+×/week']].map(([v,l])=>`<option value="${v}" ${pr.act===v?'selected':''}>${l}</option>`).join('')}</select></div>
           <div class="seg">${[['lose','Lose'],['maintain','Maintain'],['gain','Gain']].map(([v,l])=>`<button class="${pr.goal===v?'on':''}" data-act="goal" data-p="${p}" data-v="${v}">${l}</button>`).join('')}</div>
-          <span class="note">${fmtHt(BODY[p].inches)} · age ${ageOf(BODY[p].dob)}. Fills in the targets below from your height, age, weight and goal. Change any number afterward.</span></div>`; })()}
+          ${(()=>{ const b = bodyOf(p), own = pr.mode==='own'; return `<div class="row" style="gap:8px;flex-wrap:wrap;align-items:center">
+            <label class="small" style="font-weight:700">Height</label><input class="numin" inputmode="numeric" data-act="prof" data-p="${p}" data-f="ft" value="${Math.floor(b.inches/12)}" style="width:52px" aria-label="Feet"><span class="unit">ft</span><input class="numin" inputmode="numeric" data-act="prof" data-p="${p}" data-f="in" value="${b.inches%12}" style="width:52px" aria-label="Inches"><span class="unit">in</span>
+            <label class="small" style="font-weight:700;margin-left:6px">Age</label><input class="numin" inputmode="numeric" data-act="prof" data-p="${p}" data-f="age" value="${b.age}" style="width:56px" aria-label="Age">
+            <select class="numin" data-act="prof" data-p="${p}" data-f="sex" style="width:auto;text-align:left" aria-label="Sex for calorie math">${[['m','Male'],['f','Female']].map(([v,l])=>`<option value="${v}" ${b.sex===v?'selected':''}>${l}</option>`).join('')}</select></div>
+          <div class="seg">${[['auto','Calculate my calories'],['own','I\'ll enter my own']].map(([v,l])=>`<button class="${(own?'own':'auto')===v?'on':''}" data-act="calmode" data-p="${p}" data-v="${v}">${l}</button>`).join('')}</div>
+          <span class="note">${own ? 'Type your daily calories in the table below. Height, age and weight are kept but not used.' : 'Fills in the targets below from your height, age, weight, activity and goal. You can still change any number afterward.'}</span>`; })()}</div>`; })()}
       <table class="mtable" style="margin-top:8px"><tr><th>Daily</th><th>Percent</th><th>Grams</th></tr>
       <tr><td>Calories</td><td colspan="2"><input id="m-${p}-kcal" inputmode="numeric" data-act="mac" data-p="${p}" data-f="kcal" value="${m.kcal}" aria-label="${NAMES[p]} calories"><span class="unit">cal</span></td></tr>
       ${[['p','Protein'],['c','Carbs'],['f','Fat']].map(([k,l])=>`<tr><td>${l}</td><td><input id="m-${p}-${k}" inputmode="decimal" data-act="mac" data-p="${p}" data-f="${k}" value="${m[k]}" aria-label="${NAMES[p]} ${l} percent"><span class="unit">%</span></td><td><input id="m-${p}-${k}g" inputmode="numeric" data-act="macg" data-p="${p}" data-f="${k}" value="${g(k)}" aria-label="${NAMES[p]} ${l} grams"><span class="unit">g</span></td></tr>`).join('')}
@@ -1401,12 +1406,14 @@ function showDrink(id){ const x = MEALS[id].pair; openSheet(`<div class="row bet
 const BODY = {K:{inches:74, dob:'1992-10-26', sex:'m'}, Y:{inches:62, dob:'1991-05-14', sex:'f'}};
 function ageOf(dob){ const t = pd(TODAY), b = pd(dob); let a = t.getFullYear()-b.getFullYear(); if(t.getMonth()<b.getMonth() || (t.getMonth()===b.getMonth() && t.getDate()<b.getDate())) a--; return a; }
 const fmtHt = i => Math.floor(i/12)+"′"+(i%12)+"″";
+// Height, age and sex for the calorie math: what the person entered, else the defaults on file.
+const bodyOf = p => { const pr = (S.profile||{})[p]||{}, b = BODY[p]||{inches:66, dob:'', sex:'f'}; return {inches: pr.ht || b.inches, age: pr.age || (b.dob ? ageOf(b.dob) : 35), sex: pr.sex || b.sex}; };
 // Starting targets from height, age, weight, activity and goal. Rough estimate; adjust by hand.
 function autoMacros(p){
-  const pr = (S.profile||{})[p]; if(!pr || !(pr.wt>60)) return false;
+  const pr = (S.profile||{})[p]; if(!pr || !(pr.wt>60) || pr.mode==='own') return false;
   // Mifflin-St Jeor resting burn x activity factor
-  const b = BODY[p], kg = pr.wt*.4536, cm = b.inches*2.54;
-  const bmr = 10*kg + 6.25*cm - 5*ageOf(b.dob) + (b.sex==='m' ? 5 : -161);
+  const b = bodyOf(p), kg = pr.wt*.4536, cm = b.inches*2.54;
+  const bmr = 10*kg + 6.25*cm - 5*b.age + (b.sex==='m' ? 5 : -161);
   let kcal = bmr * {light:1.375, active:1.55, very:1.725}[pr.act||'active'];
   kcal *= pr.goal==='lose' ? .82 : pr.goal==='gain' ? 1.1 : 1;
   kcal = Math.round(kcal/25)*25;
@@ -1510,6 +1517,8 @@ document.addEventListener('click', e=>{
   else if(a==='mealnote'){ mealNoteSheet(t.dataset.p, t.dataset.m); }
   else if(a==='notetag'){ const k = t.dataset.k, all = Object.assign({}, S.settings.mealNotes), n = Object.assign({tags:[], note:''}, all[k]); n.tags = n.tags.includes(t.dataset.t) ? n.tags.filter(x=>x!==t.dataset.t) : n.tags.concat(t.dataset.t); all[k] = n; S.settings.mealNotes = all; t.classList.toggle('on'); }
   else if(a==='notesave'){ const k = t.dataset.k, all = Object.assign({}, S.settings.mealNotes), n = Object.assign({tags:[], note:''}, all[k]); n.note = (document.getElementById('note-'+k.replace('|','_')).value||'').trim(); all[k] = n; S.settings.mealNotes = all; changed('Meal notes'); closeSheet(); render(); toast('Saved. Claude plans around it.'); }
+  else if(a==='calmode'){ S.profile = S.profile||{}; const pr = S.profile[t.dataset.p] = S.profile[t.dataset.p]||{goal:'maintain',act:'active'}; pr.mode = t.dataset.v;
+    if(pr.mode==='auto' && autoMacros(t.dataset.p)){ changed('Macros'); toast('Targets updated for '+NAMES[t.dataset.p]+'.'); } else save(); render(); }
   else if(a==='pcolor'){ const p = t.dataset.p; if(p!==S.view.me && !KIDS.includes(p)) return; if(colorTaken(p,+t.dataset.i)){ toast('That color is taken.'); return; } S.settings.colors = Object.assign({}, S.settings.colors, {[p]:+t.dataset.i}); changed('Settings'); render(); }
   else if(a==='theme'){ lsSet('mp-theme', t.dataset.v==='auto'?null:t.dataset.v); applyTheme(); render(); }
   else if(a==='weekend'){ S.settings.weekend = t.dataset.v; changed('Settings'); render(); }
@@ -1576,7 +1585,10 @@ document.addEventListener('change', e=>{
   else if(a==='fzpri'){ S.freezer[+t.dataset.i].priority = t.value; changed('Freezer'); }
   else if(a==='listpick'){ S.checks[t.dataset.key] = t.checked; changed('Groceries'); const sc = window.scrollY; render(); window.scrollTo(0,sc); }
   else if(a==='check'){ S.checks[t.dataset.key] = t.checked; save(); t.closest('.listrow').classList.toggle('done', t.checked); }
-  else if(a==='prof'){ S.profile = S.profile||{}; const pr = S.profile[t.dataset.p] = S.profile[t.dataset.p]||{goal:'maintain',act:'active'}; pr[t.dataset.f] = t.dataset.f==='wt' ? parseFloat(t.value)||'' : t.value;
+  else if(a==='prof'){ S.profile = S.profile||{}; const pr = S.profile[t.dataset.p] = S.profile[t.dataset.p]||{goal:'maintain',act:'active'}; const f = t.dataset.f, v = parseFloat(t.value);
+    if(f==='ft' || f==='in'){ const b = bodyOf(t.dataset.p), ft = f==='ft' ? v : Math.floor(b.inches/12), inch = f==='in' ? v : b.inches%12; if(ft>0) pr.ht = Math.round(ft*12 + (inch||0)); }
+    else if(f==='age'){ if(v>0) pr.age = Math.round(v); }
+    else pr[f] = f==='wt' ? v||'' : t.value;
     if(autoMacros(t.dataset.p)){ changed('Macros'); render(); toast(`Targets updated for ${NAMES[t.dataset.p]}.`); } else save(); }
   else if(a==='spoz'){ const v = parseFloat(t.value); if(v>0){ S.spices.find(x=>x.id===t.dataset.id).size = v; changed('Seasonings'); } }
   else if(a==='budget'){ const v = parseInt(t.value,10); if(v>0){ S.settings.budget = v; changed('Settings'); } }
@@ -1755,6 +1767,9 @@ function squarePhoto(file){ return new Promise((ok,no)=>{ const r = new FileRead
 // ---------- What's new ----------
 // Newest first. Each person sees a release once, the next time they open the app; Dev and the live app track it separately.
 const RELEASES = [
+  {v:'2026-11-21l', title:"What's new", items:[
+    'Family settings: each adult can now set height, age and sex for the calorie math.',
+    'Pick Calculate my calories, or I\'ll enter my own and type your daily calories.']},
   {v:'2026-11-21f', title:"What's new", items:[
     'Meals grid now uses numbers: same number = same food. Two people can share one lunch while two others share a different one.',
     'Tap + Notes under any meal to add details like eaten at work, eat cold or no microwave. Claude plans around them.',
