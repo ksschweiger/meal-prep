@@ -328,7 +328,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-21m';
+const APP_VERSION = '2026-11-21n';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -1342,22 +1342,23 @@ function tolField(p){ const cur = tolOf(p);
   return `<div class="field" style="margin-top:12px"><span class="lbl">How close to targets</span><div class="seg">${TOL.map(t=>`<button class="${cur[0]===t[0]?'on':''}" data-act="tol" data-p="${p}" data-v="${t[0]}">${t[1]} ±${t[2]}%</button>`).join('')}</div><span class="note">${cur[3]}</span></div>`; }
 // Body details for the calorie math, one labeled row each. Weight is stored in lb and height in inches; units are just for display.
 function profForm(p){
-  const pr = (S.profile||{})[p]||{}, b = bodyOf(p), own = pr.mode==='own', wu = pr.wtUnit||'lb', hu = pr.htUnit||'imp';
+  const pr = (S.profile||{})[p]||{}, b = bodyOf(p), own = pr.mode!=='auto', wu = pr.wtUnit||'lb', hu = pr.htUnit||'imp';
   const wShow = pr.wt ? (wu==='kg' ? Math.round(pr.wt*.4536*10)/10 : pr.wt) : '';
   const sel = (f, opts, cur, label, narrow) => `<select class="pfin" ${narrow?'style="flex:0 0 92px"':''} data-act="prof" data-p="${p}" data-f="${f}" aria-label="${label}">${opts.map(([v,l])=>`<option value="${v}" ${cur===v?'selected':''}>${l}</option>`).join('')}</select>`;
   const num = (f, val, label, ph, step) => `<input class="pfin" type="number" inputmode="decimal" step="${step||'any'}" data-act="prof" data-p="${p}" data-f="${f}" value="${val}" placeholder="${ph||''}" aria-label="${label}">`;
   const row = (label, ctl) => `<span class="pflbl">${label}</span><span class="pfctl">${ctl}</span>`;
   return `<div class="cookhelp pform" style="margin-top:10px">
-    ${row('Weight', num('wt', wShow, 'Weight', wu==='kg'?'kg':'lb') + sel('wtUnit', [['lb','lb'],['kg','kg']], wu, 'Weight unit', 1))}
-    ${row('Height', sel('htUnit', [['imp','ft / in'],['met','meters']], hu, 'Height unit', 1) + (hu==='met'
+    ${row('Calories', `<div class="seg" style="flex:1">${[['own','Enter my own'],['auto','Calculate']].map(([v,l])=>`<button class="${(own?'own':'auto')===v?'on':''}" data-act="calmode" data-p="${p}" data-v="${v}">${l}</button>`).join('')}</div>`)}
+    ${own ? '' : [
+      row('Weight', num('wt', wShow, 'Weight', wu==='kg'?'kg':'lb') + sel('wtUnit', [['lb','lb'],['kg','kg']], wu, 'Weight unit', 1)),
+      row('Height', sel('htUnit', [['imp','ft / in'],['met','meters']], hu, 'Height unit', 1) + (hu==='met'
         ? num('m', Math.round(b.inches*2.54)/100, 'Height in meters', '1.80', '0.01')
-        : num('ft', Math.floor(b.inches/12), 'Feet', 'ft', '1') + num('in', b.inches%12, 'Inches', 'in', '1')))}
-    ${row('Age', num('age', b.age, 'Age', '', '1'))}
-    ${row('Sex', sel('sex', [['m','Male'],['f','Female'],['o','Other']], b.sex, 'Sex for calorie math'))}
-    ${row('Activity', sel('act', [['light','Lightly active'],['active','Trains 3–5×/week'],['very','Trains 6+×/week']], pr.act||'active', 'Activity'))}
-    ${row('Goal', sel('goal', [['lose','Lose'],['maintain','Maintain'],['gain','Gain']], pr.goal||'maintain', 'Goal'))}
-    ${row('Calories', `<div class="seg" style="flex:1">${[['auto','Calculate'],['own','Enter my own']].map(([v,l])=>`<button class="${(own?'own':'auto')===v?'on':''}" data-act="calmode" data-p="${p}" data-v="${v}">${l}</button>`).join('')}</div>`)}
-    <span class="note" style="grid-column:1/-1">${own ? 'Type your daily calories in the table below.' : 'Fills in the targets below from these details. You can still change any number afterward.'}${b.sex==='o' ? ' Other uses the midpoint of the male and female formulas.' : ''}</span></div>`;
+        : num('ft', Math.floor(b.inches/12), 'Feet', 'ft', '1') + num('in', b.inches%12, 'Inches', 'in', '1'))),
+      row('Age', num('age', b.age, 'Age', '', '1')),
+      row('Sex', sel('sex', [['m','Male'],['f','Female'],['o','Other']], b.sex, 'Sex for calorie math')),
+      row('Activity', sel('act', [['light','Lightly active'],['active','Trains 3–5×/week'],['very','Trains 6+×/week']], pr.act||'active', 'Activity')),
+      row('Goal', sel('goal', [['lose','Lose'],['maintain','Maintain'],['gain','Gain']], pr.goal||'maintain', 'Goal'))].join('')}
+    <span class="note" style="grid-column:1/-1">${own ? 'Type your daily calories in the table below, or pick Calculate to work them out from height, weight, age and activity.' : 'Fills in the targets below from these details. You can still change any number afterward.'}${b.sex==='o' ? ' Other uses the midpoint of the male and female formulas.' : ''}</span></div>`;
 }
 function vMacros(){
   const card = p => { const m = S.macros[p], cal = {p:4,c:4,f:4};
@@ -1423,7 +1424,7 @@ const fmtHt = i => Math.floor(i/12)+"′"+(i%12)+"″";
 const bodyOf = p => { const pr = (S.profile||{})[p]||{}, b = BODY[p]||{inches:66, dob:'', sex:'f'}; return {inches: pr.ht || b.inches, age: pr.age || (b.dob ? ageOf(b.dob) : 35), sex: pr.sex || b.sex}; };
 // Starting targets from height, age, weight, activity and goal. Rough estimate; adjust by hand.
 function autoMacros(p){
-  const pr = (S.profile||{})[p]; if(!pr || !(pr.wt>60) || pr.mode==='own') return false;
+  const pr = (S.profile||{})[p]; if(!pr || !(pr.wt>60) || pr.mode!=='auto') return false;
   // Mifflin-St Jeor resting burn x activity factor
   const b = bodyOf(p), kg = pr.wt*.4536, cm = b.inches*2.54;
   const bmr = 10*kg + 6.25*cm - 5*b.age + (b.sex==='m' ? 5 : b.sex==='o' ? -78 : -161);
