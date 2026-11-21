@@ -312,7 +312,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-21dev18';
+const APP_VERSION = '2026-11-21dev19';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -765,7 +765,7 @@ function render(){
   const v = document.getElementById('view');
   v.style.touchAction = ['week','day','day2'].includes(ui.tab) ? 'pan-y' : '';
   if(CAL_TABS.includes(ui.tab)) ui.calLast = ui.tab;
-  v.innerHTML = (CAL_TABS.includes(ui.tab) ? calSeg() : '')+'<div class="view">'+({calendar:vCalendar,week:vWeek,day2:vDay2,day:vDay,stats:vStats,groceries:vGroceries,pantry:vPantry,macros:vMacros,settings:vSettings,profile:vProfile,family:vFamily}[ui.tab])()+'</div>';
+  v.innerHTML = (CAL_TABS.includes(ui.tab) ? calSeg() : '')+'<div class="view">'+({calendar:vCalendar,week:vWeek,day2:vDay2,day:vDay2,stats:vStats,groceries:vGroceries,pantry:vPantry,macros:vMacros,settings:vSettings,profile:vProfile,family:vFamily}[ui.tab])()+'</div>';
   updateDot();
 }
 
@@ -892,21 +892,6 @@ function dayBanners(d){
   if(mk.shop){ const tr = ui._trips[mk.trip]; banners += `<div class="banner shop">${I.cart}<div><b>${tr.kind==='mid'?'Midweek fresh trip':'Shopping day'}</b><button class="linkbtn" data-act="goList" data-ti="${mk.trip}">See the list</button></div></div>`; }
   return banners;
 }
-function vDay(){
-  const d = ui.sel, day = S.plan.days[d];
-  const head = `<div class="dayhead"><button class="iconbtn" data-act="dnav" data-dir="-1" aria-label="Previous day">${I.left}</button><h2>${nice(d)}</h2><button class="iconbtn" data-act="dnav" data-dir="1" aria-label="Next day">${I.right}</button></div><div style="text-align:center"><button class="linkbtn" data-act="daylayout" data-v="day2">Try the new day layout ›</button></div>`;
-  let banners = dayBanners(d);
-  if(!day) return head + banners + '<div class="card muted">No meals planned for this day.</div>';
-  const flexCard = k => `<article class="meal" style="border-style:dashed"><div class="mtop"><div class="mtitle">${k==='d'||k==='l'?`<div class="who" style="--pc:var(--accent)">${k==='d'?'Family dinner':'Shared lunch'}</div>`:`<div class="who" style="--pc:${PC[KEY_PERSONS[k][0]]}"><span class="pdot"></span>${NAMES[KEY_PERSONS[k][0]]}</div>`}<h3>${(k==='ys'||k==='ks')&&S.plan.days[d][k]==='none'?'Nothing planned':!eaters(d,k).length?'Away':S.plan.days[d].off?'Open':'Flex'}</h3><div class="note">${(k==='ys'||k==='ks')&&S.plan.days[d][k]==='none'?'Snacks are off for now.':!eaters(d,k).length?`${NAMES[KEY_PERSONS[k][0]]} is away today. Nothing planned.`:S.plan.days[d].off?'Plan pushed back a day. Use leftovers or eat out.':'Eat leftovers from the week first, then whatever fits the day.'}</div></div></div></article>`;
-  const mp = {id:day.d}, drink = isDrinkNight(d) ? (()=>{ const x = MEALS[mp.id].pair; return `<button class="drinkcard" data-act="drink" data-id="${mp.id}"><span class="b drink" style="width:28px;height:28px;border-radius:8px">${GLASS[x.glass][1]}</span><span class="grow1"><b>${esc(x.n)}</b> <span class="small muted">· ${x.kind} pairing</span></span><span class="small" style="color:var(--accent);font-weight:700">Recipe ›</span></button>`; })() : '';
-  const slot = (label,keys) => { keys = keys.filter(k=>KEY_PERSONS[k].some(shows)); if(!keys.length) return ''; return `<section class="slot"><div class="eyebrow">${label}</div>${keys.map(k=>isFlex(d,k)?flexCard(k):mealCard(d,k)).join('')}${keys.includes('d')?drink:''}</section>`; };
-  const wk = isWeekend(d) && S.settings.weekend!=='full' ? `<div class="banner prep">${I.cal}<div><b>Light weekend</b>${S.settings.weekend!=='none'?'Only dinner is planned. Use up leftovers from missed meals for the rest.':'Nothing planned. Use up leftovers from the week.'}</div></div>` : '';
-  const lockb = isLocked(d) ? `<div class="banner shop">${I.cart}<div><b>Shopping done · week locked</b>Swaps only use food you bought. New requests go to next week.</div></div>` : '';
-  const seg = `<div class="seg"><button class="${S.view.mode==='mine'?'on':''}" data-act="vmode" data-v="mine">Just ${NAMES[S.view.me]}</button><button class="${S.view.mode==='both'?'on':''}" data-act="vmode" data-v="both">Both of us</button></div>`;
-  return head + seg + lockb + wk + banners +
-    `<div class="card"><div class="sum" ${S.view.mode==='mine'?'style="grid-template-columns:1fr"':''}>${['K','Y'].filter(shows).map(p=>personSummary(d,p)).join('')}</div><p class="note" style="margin:10px 0 0">${(day.away||[]).length?`${day.away.map(p=>NAMES[p]).join(' & ')} away today: shared meals are sized without ${day.away.length>1?'them':'him'}. `:''}Landen eats dinner only, about ${LANDEN_KCAL()} cal with at least 2 oz of meat.</p></div>` +
-    slot('Breakfast',['c','kb','yb']) + slot('Lunch',['l']) + slot('Dinner',['d']) + slot('Snacks',['ks','ys']);
-}
 
 
 // ---------- Week at a glance (Mon–Sun) ----------
@@ -975,7 +960,7 @@ function servingVisual(d,k,G,rows,all,ppl,why){
 function initials(p,all){ const n = NAMES[p], dup = all.some(q=>q!==p && NAMES[q][0]===n[0]); return dup ? n.slice(0,3) : n[0]; }
 function vDay2(){
   const d = ui.sel, day = S.plan.days[d];
-  const head = `<div class="dayhead"><button class="iconbtn" data-act="dnav" data-dir="-1" aria-label="Previous day">${I.left}</button><h2>${nice(d)}</h2><button class="iconbtn" data-act="dnav" data-dir="1" aria-label="Next day">${I.right}</button></div><div style="text-align:center"><button class="linkbtn" data-act="daylayout" data-v="day">Old day layout ›</button></div>`;
+  const head = `<div class="dayhead"><button class="iconbtn" data-act="dnav" data-dir="-1" aria-label="Previous day">${I.left}</button><h2>${nice(d)}</h2><button class="iconbtn" data-act="dnav" data-dir="1" aria-label="Next day">${I.right}</button></div>`;
   const banners = dayBanners(d);
   if(!day) return head + banners + '<div class="card muted">No meals planned for this day.</div>';
   const seg = `<div class="seg"><button class="${S.view.mode==='mine'?'on':''}" data-act="vmode" data-v="mine">Just ${NAMES[S.view.me]}</button><button class="${S.view.mode==='both'?'on':''}" data-act="vmode" data-v="both">Both of us</button></div>`;
@@ -1430,14 +1415,13 @@ document.addEventListener('click', e=>{
   else if(a==='calview'){ const v = t.dataset.v;
     if(v==='month'){ ui.tab = 'calendar'; const x = pd(ui.sel||TODAY); ui.ym = [x.getFullYear(), x.getMonth()]; }
     else if(v==='week'){ ui.wk = monOf(ui.tab==='calendar' ? TODAY : ui.sel); ui.tab = 'week'; }
-    else { if(ui.tab==='calendar') ui.sel = TODAY; else if(ui.tab==='week') ui.sel = ui.wk<=TODAY && TODAY<add(ui.wk,7) ? TODAY : ui.wk; ui.tab = lsGet('mp-daylayout')||'day2'; }
+    else { if(ui.tab==='calendar') ui.sel = TODAY; else if(ui.tab==='week') ui.sel = ui.wk<=TODAY && TODAY<add(ui.wk,7) ? TODAY : ui.wk; ui.tab = 'day2'; }
     render(); window.scrollTo(0,0); }
   else if(a==='mon'){ let [y,m] = ui.ym; m += +t.dataset.dir; if(m<0){m=11;y--} if(m>11){m=0;y++} ui.ym = [y,m]; render(); }
-  else if(a==='pick'){ const pm = markers(t.dataset.date); if(!S.plan.days[t.dataset.date] && !pm.thaw && !pm.shop) return; ui.sel = t.dataset.date; ui.tab = lsGet('mp-daylayout')||'day2'; render(); window.scrollTo(0,0); }
-  else if(a==='daylayout'){ ui.tab = t.dataset.v; lsSet('mp-daylayout', ui.tab); render(); }
+  else if(a==='pick'){ const pm = markers(t.dataset.date); if(!S.plan.days[t.dataset.date] && !pm.thaw && !pm.shop) return; ui.sel = t.dataset.date; ui.tab = 'day2'; render(); window.scrollTo(0,0); }
   else if(a==='wnav'){ ui.wk = add(ui.wk, +t.dataset.dir); render(); slideIn(Math.sign(+t.dataset.dir)); }
-  else if(a==='wkday'){ ui.sel = t.dataset.date; ui.tab = lsGet('mp-daylayout')||'day2'; render(); window.scrollTo(0,0); }
-  else if(a==='wkmeal'){ const d = t.dataset.date, k = t.dataset.k; ui.sel = d; ui.tab = lsGet('mp-daylayout')||'day2'; ui.mealOpen[d+'|'+k] = true; ui.slotOpen = ui.slotOpen||{}; (ui.serveShow = ui.serveShow||{})[d+'|'+k] = true; ['K','Y'].forEach(p=>{ ui.mealOpen[d+'|'+k+'|'+p] = true; ui.slotOpen[d+'|'+p+'|'+(k==='l'?'Lunch':'Dinner')] = true; }); render();
+  else if(a==='wkday'){ ui.sel = t.dataset.date; ui.tab = 'day2'; render(); window.scrollTo(0,0); }
+  else if(a==='wkmeal'){ const d = t.dataset.date, k = t.dataset.k; ui.sel = d; ui.tab = 'day2'; ui.mealOpen[d+'|'+k] = true; ui.slotOpen = ui.slotOpen||{}; (ui.serveShow = ui.serveShow||{})[d+'|'+k] = true; ['K','Y'].forEach(p=>{ ui.mealOpen[d+'|'+k+'|'+p] = true; ui.slotOpen[d+'|'+p+'|'+(k==='l'?'Lunch':'Dinner')] = true; }); render();
     const p = ['K','Y'].filter(shows).find(x=>eaters(d,k).includes(x)), el = document.getElementById(ui.tab==='day2' && S.view.mode==='both' ? 'sv-'+(d+'|'+k).replace(/[^a-z0-9]/gi,'_') : 'm-'+(ui.tab==='day' ? d+'|'+k : d+'|'+k+'|'+p).replace(/[^a-z0-9]/gi,'_'));
     if(el){ const hd = document.querySelector('header.top'); window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - (hd?hd.offsetHeight:0) - 50); } else window.scrollTo(0,0); }
   else if(a==='secopen'){ e.preventDefault(); ui.secOpen = ui.secOpen||{}; ui.secOpen[t.dataset.k] = !ui.secOpen[t.dataset.k]; const sc = window.scrollY; render(); window.scrollTo(0,sc); }
@@ -1458,7 +1442,6 @@ document.addEventListener('click', e=>{
     closeSheet(); rebuildSpices(); render(); setSync('Saving…');
     api('pantry', {updates:[up]}).then(()=>{ setSync('Saved'); toast('Updated '+r.item+'.'); }).catch(e=>{ setSync('Not saved'); toast('Could not save: '+e.message); }); }
   else if(a==='wunit'){ S.settings.wunit = Object.assign({}, S.settings.wunit, {[S.view.me]:t.dataset.v}); changed('Profile'); render(); }
-  else if(a==='phonelayout'){ lsSet('mp-daylayout', t.dataset.v); render(); }
   else if(a==='kidband'){ const k = kidsList().map(x=>Object.assign({},x)); const x = k.find(y=>y.id===t.dataset.p); if(!x) return; x.band = t.dataset.v; S.settings.kids = k; changed('Family'); render(); }
   else if(a==='kidadj'){ const k = kidsList().map(x=>Object.assign({},x)); const x = k.find(y=>y.id===t.dataset.p); if(!x) return; x.adj = Math.max(-200, Math.min(200, (x.adj||0) + +t.dataset.d)); S.settings.kids = k; changed('Family'); render(); }
   else if(a==='kidrm'){ const x = kidOf(t.dataset.p); if(!x || !confirmRm(x)) return; S.settings.kids = kidsList().filter(y=>y.id!==x.id); changed('Family'); render(); toast(x.name+' removed. Dinners rescale for everyone else.'); }
@@ -1681,7 +1664,6 @@ function vProfileBody(me){ const block = profBlock;
     <h2 style="font-size:17px;margin-top:18px">This phone</h2><div class="card">
     <div class="field"><span class="lbl">Appearance</span><div class="seg">${[['auto','Auto'],['light','Light'],['dark','Dark']].map(([v,l])=>`<button class="${(lsGet('mp-theme')||'auto')===v?'on':''}" data-act="theme" data-v="${v}">${l}</button>`).join('')}</div></div>
     <div class="field"><span class="lbl">Seasonal colors</span><div class="seg">${[['on','On'],['off','Off']].map(([v,l])=>`<button class="${(lsGet('mp-season')==='off'?'off':'on')===v?'on':''}" data-act="season" data-v="${v}">${l}</button>`).join('')}</div><span class="note">Fall and Thanksgiving through Thanksgiving Day, then Christmas through the new year.</span></div>
-    <div class="field"><span class="lbl">Day page</span><div class="seg">${[['day2','New layout'],['day','Old layout']].map(([v,l])=>`<button class="${(lsGet('mp-daylayout')||'day2')===v?'on':''}" data-act="phonelayout" data-v="${v}">${l}</button>`).join('')}</div></div>
     <span class="note">These only change this phone.</span></div>`
     + `<div style="margin-top:8px"><div class="card"><div class="row between"><div><b>${esc(USER.name)}</b><div class="small muted">${esc(USER.email)}</div></div><button class="btn" data-act="signout">Sign out</button></div></div></div>`
     ;
