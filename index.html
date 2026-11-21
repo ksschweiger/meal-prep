@@ -313,7 +313,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-21c';
+const APP_VERSION = '2026-11-21d';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -1670,11 +1670,13 @@ function vProfile(){ return vProfileBody(S.view.me); }
 // Removing a kid uses a two-tap confirm (no browser dialogs).
 let rmArm = null;
 function confirmRm(x){ if(rmArm===x.id){ rmArm = null; return true; } rmArm = x.id; toast('Tap Remove again to remove '+x.name+'.'); setTimeout(()=>{ if(rmArm===x.id) rmArm = null; }, 4000); return false; }
+// Card header used across Family settings: name on the left, summary and Show/Hide on the right.
+const famHead = (act, attrs, open, left, right) => `<div class="row between" data-act="${act}" ${attrs} role="button" tabindex="0" aria-expanded="${open}" style="cursor:pointer;gap:10px">${left}<span class="row" style="gap:8px;flex:none"><span class="small muted">${right}</span><span style="color:var(--accent);font-weight:700;font-size:13px">${open?'Hide':'Show'}</span></span></div>`;
 function vFamily(){
   if(KIDS.includes(S.view.me)) return `<h2 style="font-size:22px">Family settings</h2><div class="card muted">Parents manage family settings.</div>`;
   const kidCard = k => { const b = kidBand(k), a = ageYears(k.dob);
     const open = !!(ui.kidOpen||{})[k.id];
-    const head = `<button class="slothead" style="border-top:0;padding:2px 0" data-act="kidopen" data-p="${k.id}" aria-expanded="${open}">${avatar(k.id)}<span class="grow1"><b>${esc(k.name)}</b><br><span class="small muted">${a===null?b[1]:'Age '+a} · ${kidDaily(k.id).toLocaleString()} cal a day</span></span><span class="chev" style="${open?'transform:rotate(90deg)':''}">›</span></button>`;
+    const head = famHead('kidopen', `data-p="${k.id}"`, open, `<div class="pname" style="font-size:18px;--pc:${PC[k.id]};gap:8px">${avatar(k.id)}${esc(k.name)}</div>`, `${a===null?b[1]:'Age '+a} · ${kidDaily(k.id).toLocaleString()} cal`);
     if(!open) return `<div class="card" style="margin-top:8px">${head}</div>`;
     return `<div class="card" style="margin-top:8px">${head}<div style="margin-top:12px">${profBlock(k.id)}</div>
       <div class="field" style="margin-top:12px"><label for="kd-${k.id}">Birthday</label><input class="textin" type="date" id="kd-${k.id}" data-act="kiddob" data-p="${k.id}" value="${k.dob||''}"><span class="note">${a===null?'Add a birthday so portions grow with them. Until then: '+b[1]+'.':'Age '+a+' · '+b[1]+' portions. Moves up automatically on their birthday.'}</span></div>
@@ -1687,7 +1689,7 @@ function vFamily(){
   const cell = (p,m) => { const o = isKid(p) ? OPTS[m].filter(x=>x[0]!=='own') : OPTS[m]; if(!o.length || (isKid(p) && m==='s')) return '<td class="muted">—</td>';
     return `<td><select class="mealsel" data-act="mealset" data-p="${p}" data-m="${m}" aria-label="${NAMES[p]} ${m}">${o.map(([v,l])=>`<option value="${v}" ${g[p][m]===v?'selected':''}>${l}</option>`).join('')}</select></td>`; };
   const per = p => isKid(p) ? `${kidKcal(p)} cal each` : `${Math.round((S.macros[p].kcal - 0)/mealsOf(p)).toLocaleString()} cal each`;
-  const shared = `<div class="card" style="margin-top:8px"><button class="slothead" style="border-top:0;padding:2px 0" data-act="famshared" aria-expanded="${so}"><span class="grow1"><b>Meals</b><br><span class="small muted">Who eats which meals, shared or their own</span></span><span class="chev" style="${so?'transform:rotate(90deg)':''}">›</span></button>
+  const shared = `<div class="card" style="margin-top:8px">${famHead('famshared', '', so, `<div class="pname" style="font-size:18px">Meals</div>`, 'Who eats what')}
     ${so ? `<div class="tblwrap"><table class="stbl mgrid"><thead><tr><th></th>${ppl.map(p=>`<th>${avatar(p,ppl)}</th>`).join('')}</tr></thead><tbody>
       ${[['b','Breakfast'],['l','Lunch'],['d','Dinner'],['s','Snack']].map(([m,l])=>`<tr><td>${l}</td>${ppl.map(p=>cell(p,m)).join('')}</tr>`).join('')}
       <tr><td class="small muted">Per meal</td>${ppl.map(p=>`<td class="small muted">${mealsOf(p)} meal${mealsOf(p)>1?'s':''}<br>~${isKid(p)?kidKcal(p):Math.round(S.macros[p].kcal/mealsOf(p)).toLocaleString()} cal</td>`).join('')}</tr></tbody></table></div>
