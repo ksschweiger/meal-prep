@@ -306,7 +306,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-21dev6';
+const APP_VERSION = '2026-11-21dev7';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -1281,8 +1281,6 @@ function vSettings(){
   return `<h2 style="font-size:22px">Settings</h2><div class="card">
     <div class="field"><span class="lbl">Prep days</span><div class="chips">${DOW.map((d,i)=>`<button class="chip ${st.prep.includes(i)?'on':''}" data-act="prepday" data-i="${i}">${d}</button>`).join('')}</div></div>
     <div class="field"><span class="lbl">Shopping days (tap to add or remove)</span><div class="chips">${DOW.map((d,i)=>`<button class="chip ${shopDaysOf().includes(i)?'on':''}" data-act="shopday" data-i="${i}">${d}</button>`).join('')}</div></div>
-    <div class="field"><span class="lbl">Appearance (this phone)</span><div class="seg">${[['auto','Auto'],['light','Light'],['dark','Dark']].map(([v,l])=>`<button class="${(lsGet('mp-theme')||'auto')===v?'on':''}" data-act="theme" data-v="${v}">${l}</button>`).join('')}</div></div>
-    <div class="field"><span class="lbl">Seasonal colors</span><div class="seg">${[['on','On'],['off','Off']].map(([v,l])=>`<button class="${(lsGet('mp-season')==='off'?'off':'on')===v?'on':''}" data-act="season" data-v="${v}">${l}</button>`).join('')}</div><span class="note">Fall and Thanksgiving through Thanksgiving Day, then Christmas through the new year.</span></div>
     <div class="field"><span class="lbl">Weekends</span><div class="seg">${[['sun','Sat planned, Sun dinner only'],['light','Dinner only'],['none','Nothing planned'],['full','Full plan']].map(([v,l])=>`<button class="${st.weekend===v?'on':''}" data-act="weekend" data-v="${v}">${l}</button>`).join('')}</div><span class="note">Weekend meals not planned show as Flex, for leftovers.</span></div>
     <div class="field"><div class="row between"><span class="lbl">Most days in a row for one dinner</span><div class="stepper"><button data-act="set" data-k="maxRun" data-d="-1" aria-label="Fewer">−</button><span>${st.maxRun}</span><button data-act="set" data-k="maxRun" data-d="1" aria-label="More">+</button></div></div></div>
     <div class="field"><div class="row between"><span class="lbl">Plan ready before prep</span><div class="stepper"><button data-act="set" data-k="lead" data-d="-1" aria-label="Fewer days">−</button><span>${st.lead} days</span><button data-act="set" data-k="lead" data-d="1" aria-label="More days">+</button></div></div></div>
@@ -1293,8 +1291,7 @@ function vSettings(){
     <div class="status"><span>Changes waiting</span><span class="flag ${f.pending?'t':'f'}">${f.pending?'TRUE':'FALSE'}</span></div>
     <p class="note" style="margin:8px 0 0">${f.pending?`Last change: ${esc(f.tab||'')}${f.at?', '+fmtTime(f.at):''}. Claude's next check picks this up and resets it.`:'Nothing new since Claude last checked.'}</p>
     </div>
-  <div class="card"><div class="row between"><div><b>${esc(USER.name)}</b><div class="small muted">${esc(USER.email)}</div></div><button class="btn" data-act="signout">Sign out</button></div>
-    <button class="btn block" style="margin-top:10px" data-act="refresh">Refresh from the sheet</button></div>`;
+  <div class="card"><button class="btn block" data-act="refresh">Refresh from the sheet</button></div>`;
 }
 
 function reqSheet(){
@@ -1420,6 +1417,7 @@ document.addEventListener('click', e=>{
     closeSheet(); rebuildSpices(); render(); setSync('Saving…');
     api('pantry', {updates:[up]}).then(()=>{ setSync('Saved'); toast('Updated '+r.item+'.'); }).catch(e=>{ setSync('Not saved'); toast('Could not save: '+e.message); }); }
   else if(a==='wunit'){ S.settings.wunit = Object.assign({}, S.settings.wunit, {[S.view.me]:t.dataset.v}); changed('Profile'); render(); }
+  else if(a==='phonelayout'){ lsSet('mp-daylayout', t.dataset.v); render(); }
   else if(a==='pcolor'){ const p = t.dataset.p; if(p!==S.view.me && !KIDS.includes(p)) return; S.settings.colors = Object.assign({}, S.settings.colors, {[p]:+t.dataset.i}); changed('Settings'); render(); }
   else if(a==='theme'){ lsSet('mp-theme', t.dataset.v==='auto'?null:t.dataset.v); applyTheme(); render(); }
   else if(a==='weekend'){ S.settings.weekend = t.dataset.v; changed('Settings'); render(); }
@@ -1602,7 +1600,13 @@ function vProfile(){
     ${p===S.view.me?`<div class="field" style="margin-top:12px"><span class="lbl">Weigh in</span><div class="seg">${[['g','Grams'],['oz','Ounces']].map(([v,l])=>`<button class="${WU()===v?'on':''}" data-act="wunit" data-v="${v}">${l}</button>`).join('')}</div><span class="note">Servings, cooked weights and pantry sizes show in this unit. Rice stays in cups.</span></div>`:''}
     <div class="field" style="margin-top:12px"><span class="lbl">Color</span><span class="chips" style="gap:8px">${PALETTE.map((sw,i)=>`<button class="swatch ${c[p]===i?'on':''}" style="--sw:${isDark()?sw[2]:sw[1]}" data-act="pcolor" data-p="${p}" data-i="${i}" aria-label="${sw[0]}"></button>`).join('')}</span></div>`;
   const kids = KIDS.includes(me) ? [] : KIDS.filter(p=>NAMES[p]);
-  return `<h2 style="font-size:22px">My profile</h2><div class="card">${block(me)}</div>`
+  return `<h2 style="font-size:22px">My profile</h2><div class="card">${block(me)}</div>
+    <h2 style="font-size:17px;margin-top:18px">This phone</h2><div class="card">
+    <div class="field"><span class="lbl">Appearance</span><div class="seg">${[['auto','Auto'],['light','Light'],['dark','Dark']].map(([v,l])=>`<button class="${(lsGet('mp-theme')||'auto')===v?'on':''}" data-act="theme" data-v="${v}">${l}</button>`).join('')}</div></div>
+    <div class="field"><span class="lbl">Seasonal colors</span><div class="seg">${[['on','On'],['off','Off']].map(([v,l])=>`<button class="${(lsGet('mp-season')==='off'?'off':'on')===v?'on':''}" data-act="season" data-v="${v}">${l}</button>`).join('')}</div><span class="note">Fall and Thanksgiving through Thanksgiving Day, then Christmas through the new year.</span></div>
+    <div class="field"><span class="lbl">Day page</span><div class="seg">${[['day2','New layout'],['day','Old layout']].map(([v,l])=>`<button class="${(lsGet('mp-daylayout')||'day2')===v?'on':''}" data-act="phonelayout" data-v="${v}">${l}</button>`).join('')}</div></div>
+    <span class="note">These only change this phone.</span></div>`
+    + `<div style="margin-top:8px"><div class="card"><div class="row between"><div><b>${esc(USER.name)}</b><div class="small muted">${esc(USER.email)}</div></div><button class="btn" data-act="signout">Sign out</button></div></div></div>`
     + (kids.length ? `<h2 style="font-size:17px;margin-top:18px">Kids</h2>${kids.map(p=>`<div class="card" style="margin-top:8px">${block(p)}</div>`).join('')}` : '');
 }
 // Center-crop a photo to a 160px square JPEG (a few KB) so it fits in the sheet.
