@@ -311,7 +311,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-21dev10';
+const APP_VERSION = '2026-11-21dev12';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -484,7 +484,7 @@ function spiceNeeds(start,end){
   }
   return g;
 }
-const shows = p => S.view.mode==='both' || p===S.view.me || p==='L';
+const shows = p => S.view.mode==='both' || p===S.view.me || isKid(p);
 // 'sun' mode: Saturday is planned like a weekday, only Sunday is light.
 function isWeekend(d){ const w = dow(d); return S && S.settings.weekend==='sun' ? w===0 : (w===0 || w===6); }
 // away: [person] = gone all day. out: {slot:[person]} = skips just that meal.
@@ -499,7 +499,7 @@ const ui = {macOpen:{K:true,Y:true}, mealOpen:{}, tab:'calendar', sel:TODAY, ym:
 const cg = (c,p) => p==='K' ? c[1] : p==='Y' ? c[2] : c[2]*.3; // Landen's real amount comes from raw() below
 const baseKcal = (id,p) => MEALS[id].comps.reduce((a,c)=>a + FOODS[c[0]].k*cg(c,p)/100, 0);
 function fac(date,p){
-  if(p==='L') p='Y';
+  if(isKid(p)) p='Y';
   const day = S.plan.days[date]; if(!day) return 1;
   let b = 0, fixed = 0;
   PERSON_KEYS[p].filter(k=>MEALS[day[k]]).forEach(k=>MEALS[day[k]].comps.forEach(c=>{ const kc = FOODS[c[0]].k*cg(c,p)/100; if(FOODS[c[0]].fixed) fixed += kc; else b += kc; }));
@@ -507,20 +507,36 @@ function fac(date,p){
 }
 // Fixed items (the morning latte) stay the same size; everything else scales to hit targets.
 // Landen (dinner only): a 4-year-old's dinner is about a quarter of a ~1,400 cal day (USDA, moderately active boy),
-// so his plate is Kayla's dinner scaled to settings.landenKcal (default 375 cal), with at least 2 oz of cooked meat.
-const LANDEN_KCAL = () => S.settings.landenKcal || 375, LANDEN_MEAT_COOKED = 57;
-function landenScale(date){
+// so a kid's plate is Kayla's dinner scaled to their age band's dinner calories, with a minimum of cooked meat.
+// Kids eat dinner only. Each kid's dinner comes from their age band (about a quarter of the day's calories, USDA
+// estimates for a moderately active child) with a minimum of cooked meat; parents can nudge it up or down.
+const AGE_BANDS = [['1-3','1–3 yrs',300,28],['4-5','4–5 yrs',375,57],['6-8','6–8 yrs',425,57],['9-11','9–11 yrs',500,85],['12-13','12–13 yrs',575,85],['14-17','14–17 yrs',650,113]];
+const ageYears = dob => { if(!dob) return null; const t = pd(TODAY), b = pd(dob); let a = t.getFullYear()-b.getFullYear(); if(t.getMonth()<b.getMonth() || (t.getMonth()===b.getMonth() && t.getDate()<b.getDate())) a--; return a; };
+function kidsList(){ const k = S && S.settings && S.settings.kids; return Array.isArray(k) ? k : [{id:'L', name:'Landen', band:'4-5', adj:(S&&S.settings&&S.settings.landenKcal) ? S.settings.landenKcal-375 : 0}]; }
+const kidOf = p => kidsList().find(k=>k.id===p);
+const isKid = p => !!(S && kidOf(p));
+function kidBand(k){ const a = ageYears(k.dob); const id = a===null ? (k.band||'4-5') : a<=3 ? '1-3' : a<=5 ? '4-5' : a<=8 ? '6-8' : a<=11 ? '9-11' : a<=13 ? '12-13' : '14-17'; return AGE_BANDS.find(b=>b[0]===id); }
+const kidKcal = p => { const k = kidOf(p); return k ? kidBand(k)[2] + (k.adj||0) : 375; };
+const kidMeat = p => { const k = kidOf(p); return k ? kidBand(k)[3] : 57; };
+// Keep the people tables in step with the kids list (names, colors, who eats dinner).
+function syncKids(){
+  Object.keys(NAMES).filter(p=>!['K','Y'].includes(p) && !kidOf(p)).forEach(p=>{ delete NAMES[p]; delete PC[p]; delete PVAR[p]; });
+  kidsList().forEach(k=>{ NAMES[k.id] = k.name; PVAR[k.id] = k.id==='L' ? '--l' : '--p-'+k.id; PC[k.id] = 'var('+PVAR[k.id]+')'; TAPE_LETTER[k.id] = k.name[0]; });
+  KIDS.length = 0; kidsList().forEach(k=>KIDS.push(k.id));
+  KEY_PERSONS.d = ['K','Y'].concat(KIDS);
+}
+function landenScale(date,p){
   const day = S.plan.days[date], m = day && MEALS[day.d]; if(!m) return {r:0, meat:1};
   const fy = fac(date,'Y'); let kc = 0, meatCooked = 0;
   m.comps.forEach(c=>{ const F = FOODS[c[0]], g = c[2]*fy; kc += F.k*g/100; if(F.cat==='Meat') meatCooked += g*(F.y||.72); });
-  const r = kc ? LANDEN_KCAL()/kc : 0, have = meatCooked*r;
-  return {r, meat: have>0 && have<LANDEN_MEAT_COOKED ? LANDEN_MEAT_COOKED/have : 1};
+  const r = kc ? kidKcal(p)/kc : 0, have = meatCooked*r, need = kidMeat(p);
+  return {r, meat: have>0 && have<need ? need/have : 1};
 }
-const raw = (date,p,c) => { if(p==='L'){ const L = landenScale(date); return c[2]*fac(date,'Y')*L.r*(FOODS[c[0]].cat==='Meat' ? L.meat : 1); }
+const raw = (date,p,c) => { if(isKid(p)){ const L = landenScale(date,p); return c[2]*fac(date,'Y')*L.r*(FOODS[c[0]].cat==='Meat' ? L.meat : 1); }
   return FOODS[c[0]].fixed ? cg(c,p) : cg(c,p)*fac(date,p); };
 function dayMacros(date,p){
   const day = S.plan.days[date], t = {k:0,p:0,c:0,f:0};
-  PERSON_KEYS[p].filter(k=>!isFlex(date,k) && !isSkipped(date,k) && !isAway(date,p) && eaters(date,k).includes(p==='L'?'Y':p)).forEach(k=>MEALS[day[k]].comps.forEach(c=>{ const f = FOODS[c[0]], g = raw(date,p,c)/100; t.k+=f.k*g; t.p+=f.p*g; t.c+=f.c*g; t.f+=f.f*g; }));
+  PERSON_KEYS[p].filter(k=>!isFlex(date,k) && !isSkipped(date,k) && !isAway(date,p) && eaters(date,k).includes(isKid(p)?'Y':p)).forEach(k=>MEALS[day[k]].comps.forEach(c=>{ const f = FOODS[c[0]], g = raw(date,p,c)/100; t.k+=f.k*g; t.p+=f.p*g; t.c+=f.c*g; t.f+=f.f*g; }));
   return t;
 }
 const targets = p => { const m = S.macros[p]; return {k:m.kcal, p:m.kcal*m.p/400, c:m.kcal*m.c/400, f:m.kcal*m.f/900}; };
@@ -730,7 +746,7 @@ const fmtTime = iso => { const d = new Date(iso); return nice(ds(d))+', '+d.toLo
 
 // ---------- Views ----------
 // Day isn't in the tab bar: open a day from the calendar.
-const TABS = [['calendar','Calendar',I.cal],['groceries','Groceries',I.cart],['stats','Stats',I.chart],['pantry','Pantry',I.jar],['macros','Macros',I.gauge]];
+const TABS = [['calendar','Calendar',I.cal],['groceries','Groceries',I.cart],['stats','Stats',I.chart],['pantry','Pantry',I.jar]];
 // Calendar tab has three views picked at the top: Month, Week, Day (the day page uses whichever layout was last chosen).
 const CAL_TABS = ['calendar','week','day','day2'];
 const calSeg = () => { const v = ui.tab==='calendar' ? 'month' : ui.tab==='week' ? 'week' : 'day';
@@ -738,9 +754,10 @@ const calSeg = () => { const v = ui.tab==='calendar' ? 'month' : ui.tab==='week'
 function render(){
   ui._trips = null;
   applyTallow();
+  syncKids();
   applyColors();
   const me = document.getElementById('meav'); if(me) me.innerHTML = avatar(S.view.me);
-  const pop = document.getElementById('mepop'); if(pop){ pop.hidden = !ui.menu; pop.innerHTML = ui.menu ? `<div class="mescrim" data-act="memenu"></div><div class="mepop" role="menu">${[['profile','Personal settings','Photo, color, units, this phone'],['settings','Meal prep settings','Shopping, prep days, budget, store'],['family','Family settings','Kids and household members']].map(([t,l,sub])=>`<button role="menuitem" class="${ui.tab===t?'on':''}" data-act="tab" data-tab="${t}"><b>${l}</b><span class="small muted">${sub}</span></button>`).join('')}</div>` : ''; }
+  const pop = document.getElementById('mepop'); if(pop){ pop.hidden = !ui.menu; pop.innerHTML = ui.menu ? `<div class="mescrim" data-act="memenu"></div><div class="mepop" role="menu">${[['profile','Personal settings','Photo, color, units, this phone'],['settings','Meal prep settings','Shopping, prep days, budget, store'],['family','Family settings','Macros, kids and their portions']].map(([t,l,sub])=>`<button role="menuitem" class="${ui.tab===t?'on':''}" data-act="tab" data-tab="${t}"><b>${l}</b><span class="small muted">${sub}</span></button>`).join('')}</div>` : ''; }
   document.getElementById('tabs').innerHTML = TABS.map(t=>`<button data-act="tab" data-tab="${t[0]}" class="${ui.tab===t[0] || (t[0]==='calendar' && CAL_TABS.includes(ui.tab))?'on':''}" aria-label="${t[1]}">${t[2]}<span>${t[1]}</span></button>`).join('');
   const v = document.getElementById('view');
   v.style.touchAction = ['week','day','day2'].includes(ui.tab) ? 'pan-y' : '';
@@ -793,7 +810,7 @@ function mealCard(date,key,only,opts){
   const who = fam ? `<div class="who" style="--pc:var(--accent)">Family dinner</div>` : key==='l' ? `<div class="who" style="--pc:var(--accent)">Shared lunch · Kaleb & Kayla</div>` : key==='c' ? `<div class="who" style="--pc:var(--accent)">Both of you · every morning</div>` : `<div class="who" style="--pc:${PC[persons[0]]}"><span class="pdot"></span>${NAMES[persons[0]]}</div>`;
   const tags = (m.style?`<span class="tag style" style="--sc:${STYLE_COLOR[m.style]}">${m.style}</span>`:'')+`<span class="tag">${m.tool}</span>`+(run.length>1&&key!=='c'?`<span class="tag">Day ${idx+1} of ${run.length}</span>`:'')+[[1,'👍'],[-1,'👎']].map(([v,e])=>{ const w = Object.keys(votesOf(G.id)).filter(p=>p!==S.view.me && votesOf(G.id)[p]===v).map(p=>p==='?'?'someone':NAMES[p]); return w.length?`<span class="tag">${e} ${esc(w.join(', '))}</span>`:''; }).join('');
   // only = a person's section on the new day page: show just their portion (Kayla's dinner also shows Landen's).
-  const vis = only ? eaters(date,key).filter(x=>x===only || (only==='Y' && x==='L')) : eaters(date,key).filter(shows);
+  const vis = only ? eaters(date,key).filter(x=>x===only || (only==='Y' && isKid(x))) : eaters(date,key).filter(shows);
   const tape = (p,txt) => `<span class="tape" style="--pc:${PC[p]}"><b title="${NAMES[p]}">${TAPE_LETTER[p]||p}</b>${txt}</span>`;
   const rows = G.list.map(g=> g.cooks || g.each || g.scoop
     ? `<div class="grow"><span class="gname">${esc(g.name)}</span><span class="tapes">${vis.map(p=>tape(p,fmtPortion(g,p))).join('')}</span></div>`
@@ -1280,8 +1297,7 @@ function vMacros(){
       <tr><td>Calories</td><td colspan="2"><input id="m-${p}-kcal" inputmode="numeric" data-act="mac" data-p="${p}" data-f="kcal" value="${m.kcal}" aria-label="${NAMES[p]} calories"><span class="unit">cal</span></td></tr>
       ${[['p','Protein'],['c','Carbs'],['f','Fat']].map(([k,l])=>`<tr><td>${l}</td><td><input id="m-${p}-${k}" inputmode="decimal" data-act="mac" data-p="${p}" data-f="${k}" value="${m[k]}" aria-label="${NAMES[p]} ${l} percent"><span class="unit">%</span></td><td><input id="m-${p}-${k}g" inputmode="numeric" data-act="macg" data-p="${p}" data-f="${k}" value="${g(k)}" aria-label="${NAMES[p]} ${l} grams"><span class="unit">g</span></td></tr>`).join('')}
       </table></div></div>`; };
-  return `<h2 style="font-size:22px">Daily targets</h2><p class="note" style="margin:-6px 0 0">Enter your weight and goal to fill these in. Change a percent or grams and the other updates. Portions in the calendar rescale to match.</p>` + card('K') + card('Y') +
-    `<div class="card"><div class="row between"><div><b>Landen</b><div class="note">Dinner only. About 375 cal is right for a 4-year-old (a quarter of a ~1,400 cal day), with at least 2 oz of meat.</div></div><div class="stepper"><button data-act="lan" data-d="-25" aria-label="Less">−</button><span>${LANDEN_KCAL()} cal</span><button data-act="lan" data-d="25" aria-label="More">+</button></div></div></div>`;
+  return `<h2 style="font-size:22px">Daily targets</h2><p class="note" style="margin:-6px 0 0">Enter your weight and goal to fill these in. Change a percent or grams and the other updates. Portions in the calendar rescale to match.</p>` + card('K') + card('Y') + `<p class="note">Kids' dinner portions are in Family settings.</p>`;
 }
 
 function vSettings(){
@@ -1427,6 +1443,9 @@ document.addEventListener('click', e=>{
     api('pantry', {updates:[up]}).then(()=>{ setSync('Saved'); toast('Updated '+r.item+'.'); }).catch(e=>{ setSync('Not saved'); toast('Could not save: '+e.message); }); }
   else if(a==='wunit'){ S.settings.wunit = Object.assign({}, S.settings.wunit, {[S.view.me]:t.dataset.v}); changed('Profile'); render(); }
   else if(a==='phonelayout'){ lsSet('mp-daylayout', t.dataset.v); render(); }
+  else if(a==='kidband'){ const k = kidsList().map(x=>Object.assign({},x)); const x = k.find(y=>y.id===t.dataset.p); if(!x) return; x.band = t.dataset.v; S.settings.kids = k; changed('Family'); render(); }
+  else if(a==='kidadj'){ const k = kidsList().map(x=>Object.assign({},x)); const x = k.find(y=>y.id===t.dataset.p); if(!x) return; x.adj = Math.max(-200, Math.min(200, (x.adj||0) + +t.dataset.d)); S.settings.kids = k; changed('Family'); render(); }
+  else if(a==='kidrm'){ const x = kidOf(t.dataset.p); if(!x || !confirmRm(x)) return; S.settings.kids = kidsList().filter(y=>y.id!==x.id); changed('Family'); render(); toast(x.name+' removed. Dinners rescale for everyone else.'); }
   else if(a==='pcolor'){ const p = t.dataset.p; if(p!==S.view.me && !KIDS.includes(p)) return; S.settings.colors = Object.assign({}, S.settings.colors, {[p]:+t.dataset.i}); changed('Settings'); render(); }
   else if(a==='theme'){ lsSet('mp-theme', t.dataset.v==='auto'?null:t.dataset.v); applyTheme(); render(); }
   else if(a==='weekend'){ S.settings.weekend = t.dataset.v; changed('Settings'); render(); }
@@ -1467,7 +1486,6 @@ document.addEventListener('click', e=>{
   else if(a==='popen'){ e.preventDefault(); ui.popen = ui.popen||{}; ui.popen[t.dataset.t] = !ui.popen[t.dataset.t]; render(); }
   else if(a==='signout'){ signOut(false); }
   else if(a==='refresh' || a==='retry'){ boot().then(()=>toast('Up to date.')); }
-  else if(a==='lan'){ S.settings.landenKcal = Math.max(200, Math.min(700, LANDEN_KCAL() + +t.dataset.d)); changed('Macros'); render(); }
   else if(a==='prepday'){ const i = +t.dataset.i, p = S.settings.prep; S.settings.prep = p.includes(i) ? p.filter(x=>x!==i) : [...p,i].sort(); changed('Settings'); render(); }
   else if(a==='set'){ const k = t.dataset.k, lim = {maxRun:[1,5], lead:[1,6]}[k]; S.settings[k] = Math.max(lim[0], Math.min(lim[1], S.settings[k] + +t.dataset.d)); changed('Settings'); render(); }
   else if(a==='openReq'){ openSheet(reqSheet()); }
@@ -1479,6 +1497,7 @@ document.addEventListener('click', e=>{
 
 document.addEventListener('change', e=>{
   const t = e.target, a = t.dataset.act;
+  if(a==='kiddob'){ const k = kidsList().map(x=>Object.assign({},x)); const x = k.find(y=>y.id===t.dataset.p); if(!x) return; x.dob = t.value || ''; S.settings.kids = k; changed('Family'); render(); return; }
   if(a==='cooked'){ const v = parseFloat(t.value)*(WU()==='oz'?28.35:1); S.cooked[t.dataset.run] = S.cooked[t.dataset.run]||{}; if(v>0) S.cooked[t.dataset.run][t.dataset.grp] = v; else delete S.cooked[t.dataset.run][t.dataset.grp]; changed('Cooked weights'); const sc = window.scrollY; render(); window.scrollTo(0,sc); toast('Portions updated from the cooked weight.'); }
   else if(a==='drinkon'){ S.drinkOn = S.drinkOn||{}; S.drinkOn[t.dataset.date] = t.checked; changed('Drinks'); const id = S.plan.days[t.dataset.date].d; render(); if(t.checked) showDrink(id); }
   else if(a==='photo'){ const f = t.files && t.files[0], p = t.dataset.p; t.value = ''; if(!f || (p!==S.view.me && !KIDS.includes(p))) return;
@@ -1517,6 +1536,8 @@ document.addEventListener('submit', e=>{
     const ex = food!=='other' && S.freezer.find(x=>x.food===food);
     if(ex) ex.lb += lb; else S.freezer.push({item:food==='other'?nm:FOODS[food].n, key:food==='other'?'':food, food:food==='other'?'':food, lb, priority:'Normal', cost:'', notes:''});
     changed('Freezer'); render(); toast(`Added ${lb} lb.`); }
+  if(f==='kid'){ const nm = document.getElementById('kid-name').value.trim(); if(!nm) return; let id = 'C'+Date.now().toString(36).slice(-4).toUpperCase();
+    S.settings.kids = kidsList().map(x=>Object.assign({},x)).concat({id, name:nm, band:'4-5'}); changed('Family'); render(); toast('Added '+nm+'. Set their birthday so portions fit.'); }
   if(f==='sp'){ const nm = document.getElementById('sp-name').value.trim(); if(!nm) return; const raw = parseFloat(document.getElementById('sp-size').value)||0, unit = document.getElementById('sp-unit').value, type = document.getElementById('sp-kind').value;
     const qty = Math.max(0, parseFloat(document.getElementById('sp-qty').value)); S.punits = Object.assign({}, S.punits, {[nm.toLowerCase()]:unit}); changed('Pantry units'); clearTimeout(syncT); sync(); const size = Math.round(toOz(raw,unit)*10)/10;
     api('pantry', {adds:[{item:nm, type, size, left:isNaN(qty)?1:qty, notes:'Added in the app'}]}).then(()=>boot()).then(()=>toast(`Added ${nm}. Claude will link it to recipes on the next check.`)).catch(err=>toast('Could not add: '+err.message)); }
@@ -1596,7 +1617,7 @@ const PVAR = {K:'--k',Y:'--y',L:'--l'}, KIDS = ['L'];
 function isDark(){ const v = lsGet('mp-theme'); return v==='dark' || (!v && matchMedia('(prefers-color-scheme: dark)').matches); }
 function applyColors(){
   const c = (S && S.settings && S.settings.colors) || {}, dark = isDark(), st = document.documentElement.style;
-  Object.keys(PVAR).forEach(p=>{ const sw = PALETTE[c[p]]; if(sw) st.setProperty(PVAR[p], dark ? sw[2] : sw[1]); else st.removeProperty(PVAR[p]); });
+  Object.keys(PVAR).forEach((p,i)=>{ const sw = PALETTE[c[p]!==undefined ? c[p] : (['K','Y','L'].includes(p) ? -1 : (i+3)%PALETTE.length)]; if(sw) st.setProperty(PVAR[p], dark ? sw[2] : sw[1]); else st.removeProperty(PVAR[p]); });
 }
 // Avatar circle: the person's photo if they added one, else their initials, on their color.
 function avatar(p,all,big){ const ph = (S.photos||{})[p], ppl = all || Object.keys(NAMES);
@@ -1604,9 +1625,20 @@ function avatar(p,all,big){ const ph = (S.photos||{})[p], ppl = all || Object.ke
 // My profile: your own photo and color, plus the kids' if you're a parent. Other adults' profiles aren't shown.
 function vProfile(){ return vProfileBody(S.view.me); }
 // Family settings: kids' photos and colors (parents set these). Adding household members comes with the household setup step.
-function vFamily(){ const kids = KIDS.filter(p=>NAMES[p]);
-  return `<h2 style="font-size:22px">Family settings</h2>` + (KIDS.includes(S.view.me) ? '<div class="card muted">Parents manage family settings.</div>'
-    : kids.map(p=>`<div class="card" style="margin-top:8px">${profBlock(p)}</div>`).join('') + `<p class="note">Adding and removing family members is coming next.</p>`);
+// Removing a kid uses a two-tap confirm (no browser dialogs).
+let rmArm = null;
+function confirmRm(x){ if(rmArm===x.id){ rmArm = null; return true; } rmArm = x.id; toast('Tap Remove again to remove '+x.name+'.'); setTimeout(()=>{ if(rmArm===x.id) rmArm = null; }, 4000); return false; }
+function vFamily(){
+  if(KIDS.includes(S.view.me)) return `<h2 style="font-size:22px">Family settings</h2><div class="card muted">Parents manage family settings.</div>`;
+  const kidCard = k => { const b = kidBand(k), a = ageYears(k.dob);
+    return `<div class="card" style="margin-top:8px">${profBlock(k.id)}
+      <div class="field" style="margin-top:12px"><label for="kd-${k.id}">Birthday</label><input class="textin" type="date" id="kd-${k.id}" data-act="kiddob" data-p="${k.id}" value="${k.dob||''}"><span class="note">${a===null?'Add a birthday so portions grow with them. Until then: '+b[1]+'.':'Age '+a+' · '+b[1]+' portions. Moves up automatically on their birthday.'}</span></div>
+      ${k.dob?'':`<div class="field"><span class="lbl">Age</span><div class="chips">${AGE_BANDS.map(x=>`<button class="chip ${b[0]===x[0]?'on':''}" data-act="kidband" data-p="${k.id}" data-v="${x[0]}">${x[1]}</button>`).join('')}</div></div>`}
+      <div class="field"><div class="row between"><span class="lbl">Dinner portion</span><div class="stepper"><button data-act="kidadj" data-p="${k.id}" data-d="-25" aria-label="Less">−</button><span>${kidKcal(k.id)} cal</span><button data-act="kidadj" data-p="${k.id}" data-d="25" aria-label="More">+</button></div></div>
+        <span class="note">Dinner only. ${b[1]}: about ${b[2]} cal and at least ${wt(b[3])} of cooked meat${k.adj?` (you've set ${k.adj>0?'+':''}${k.adj} cal)`:''}. Same meal as the family, scaled down.</span></div>
+      <button class="linkbtn" style="color:var(--bad)" data-act="kidrm" data-p="${k.id}">Remove ${esc(k.name)}</button></div>`; };
+  return `<h2 style="font-size:22px">Family settings</h2>` + vMacros().replace('<h2 style="font-size:22px">Daily targets</h2>','<h2 style="font-size:17px;margin-top:10px">Adults · daily targets</h2>').replace(`<p class="note">Kids' dinner portions are in Family settings.</p>`,'') + `<h2 style="font-size:17px;margin-top:18px">Kids</h2>${kidsList().map(kidCard).join('')}
+    <div class="card" style="margin-top:8px"><form class="addform" data-form="kid" style="margin:0"><input id="kid-name" placeholder="Child's name" aria-label="Child's name"><button class="btn primary" type="submit">+ Add child</button></form><span class="note">Kids get the family dinner, portioned for their age.</span></div>`;
 }
 function profBlock(p){ const c = S.settings.colors || {}; return `<div class="row" style="gap:14px;align-items:center">${avatar(p,null,true)}<div style="flex:1"><h3 style="font-size:18px">${NAMES[p]}</h3>
       <div class="row" style="gap:8px;margin-top:6px"><label class="btn" for="ph-${p}" style="padding:6px 12px;cursor:pointer">${(S.photos||{})[p]?'Change photo':'Add photo'}</label><input type="file" id="ph-${p}" accept="image/*" data-act="photo" data-p="${p}" hidden>${(S.photos||{})[p]?`<button class="linkbtn" data-act="rmphoto" data-p="${p}">Remove</button>`:''}</div></div></div>
