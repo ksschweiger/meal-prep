@@ -6,6 +6,11 @@
 <meta name="theme-color" content="#D9620F">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Meal Prep">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
 <title>Schweiger Meal Prep</title>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -143,6 +148,7 @@ main{padding-block:14px 110px}
 .meav{background:none;border:0;padding:0;margin-left:8px;cursor:pointer;display:flex}
 .pitem{background:none;border:0;padding:0;font:inherit;color:inherit;text-align:left;cursor:pointer}
 .swatch{width:22px;height:22px;border-radius:50%;background:var(--sw);border:2px solid var(--surface);box-shadow:0 0 0 1px var(--line);padding:0;cursor:pointer}.mgrid td,.mgrid th{text-align:center;padding:6px 3px}.mgrid td:first-child{text-align:left;font-weight:600;width:auto}
+.notebtn{display:block;margin:4px auto 0;background:none;border:0;color:var(--accent);font-size:11.5px;font-weight:700;padding:2px;cursor:pointer}.notebtn.on{color:var(--good)}
 .mealsel{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:5px 4px;font:inherit;font-size:13px;max-width:84px}
 .swatch.taken{opacity:.25;cursor:not-allowed}
 .swatch.on{box-shadow:0 0 0 2px var(--ink)}
@@ -313,7 +319,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-21e';
+const APP_VERSION = '2026-11-21f';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -339,8 +345,8 @@ function spoonAmt(amt,unit,lb){
 }
 const STYLE_COLOR = {Cozy:'var(--s-cozy)',Asian:'var(--s-asian)',Mexican:'var(--s-mexican)',Mediterranean:'var(--s-med)'};
 const KEY_SLOT = {c:'coffee',kb:'breakfast',l:'lunch',ks:'snack',yb:'breakfast',ys:'snack',d:'dinner'};
-const KEY_PERSONS = {c:['K','Y'],kb:['K'],b:['K','Y'],l:['K','Y'],kl:['K'],yl:['Y'],ks:['K'],yb:['Y'],ys:['Y'],d:['K','Y','L']};
-const PERSON_KEYS = {K:['c','kb','b','l','kl','d','ks'],Y:['c','yb','b','l','yl','d','ys']};
+const KEY_PERSONS = {c:['K','Y'],kb:['K'],b:['K','Y'],b2:[],l:['K','Y'],l2:[],kl:['K'],yl:['Y'],ks:['K'],yb:['Y'],ys:['Y'],d:['K','Y','L'],d2:[]};
+const PERSON_KEYS = {K:['c','kb','b','b2','l','l2','kl','d','d2','ks'],Y:['c','yb','b','b2','l','l2','yl','d','d2','ys']};
 const NAMES = {K:'Kaleb',Y:'Kayla',L:'Landen'};
 const PC = {K:'var(--k)',Y:'var(--y)',L:'var(--l)'};
 // Letter shown on portion labels (internal codes stay K/Y/L): H = husband (Kaleb), W = wife (Kayla).
@@ -670,7 +676,7 @@ function pullForward(w){
 }
 // A shopping week runs from the shop day's dinner to the next shop day's lunch (pickup is midday).
 // One trip a week by default. With settings.freshTrip on, produce used from day 4 on goes on a lighter midweek trip.
-const MORNING = ['kb','yb','b','l','kl','yl'];
+const MORNING = ['kb','yb','b','b2','l','l2','kl','yl'];
 function needsRange(start,end,shopWeek,noCarry){
   const need = {}, late = {}, spices = new Set(), meals = new Set(), use = {}, when = {};
   const last = shopWeek ? add(end,1) : end, mid = add(start,3);
@@ -827,7 +833,7 @@ function mealCard(date,key,only,opts){
   opts = opts||{};
   const G = groups(date,key), m = G.meal, persons = KEY_PERSONS[key], fam = key==='d', r = myVote(G.id);
   const run = G.run, idx = run.indexOf(date), cyc = S.plan.cycles[cycleOf(run[0])];
-  const who = fam ? `<div class="who" style="--pc:var(--accent)">Family dinner</div>` : key==='b' ? `<div class="who" style="--pc:var(--accent)">Shared breakfast · Kaleb & Kayla</div>` : key==='l' ? `<div class="who" style="--pc:var(--accent)">Shared lunch · Kaleb & Kayla</div>` : key==='c' ? `<div class="who" style="--pc:var(--accent)">Both of you · every morning</div>` : `<div class="who" style="--pc:${PC[persons[0]]}"><span class="pdot"></span>${NAMES[persons[0]]}</div>`;
+  const who = ['b2','l2','d2'].includes(key) ? `<div class="who" style="--pc:var(--accent)">Shared · ${persons.map(p=>NAMES[p]).join(' & ')}</div>` : fam ? `<div class="who" style="--pc:var(--accent)">Family dinner</div>` : key==='b' ? `<div class="who" style="--pc:var(--accent)">Shared breakfast · Kaleb & Kayla</div>` : key==='l' ? `<div class="who" style="--pc:var(--accent)">Shared lunch · Kaleb & Kayla</div>` : key==='c' ? `<div class="who" style="--pc:var(--accent)">Both of you · every morning</div>` : `<div class="who" style="--pc:${PC[persons[0]]}"><span class="pdot"></span>${NAMES[persons[0]]}</div>`;
   const tags = (m.style?`<span class="tag style" style="--sc:${STYLE_COLOR[m.style]}">${m.style}</span>`:'')+`<span class="tag">${m.tool}</span>`+(run.length>1&&key!=='c'?`<span class="tag">Day ${idx+1} of ${run.length}</span>`:'')+[[1,'👍'],[-1,'👎']].map(([v,e])=>{ const w = Object.keys(votesOf(G.id)).filter(p=>p!==S.view.me && votesOf(G.id)[p]===v).map(p=>p==='?'?'someone':NAMES[p]); return w.length?`<span class="tag">${e} ${esc(w.join(', '))}</span>`:''; }).join('');
   // only = a person's section on the new day page: show just their portion (Kayla's dinner also shows Landen's).
   const vis = only ? eaters(date,key).filter(x=>x===only || (only==='Y' && isKid(x))) : eaters(date,key).filter(shows);
@@ -853,8 +859,8 @@ function mealCard(date,key,only,opts){
   const tareTip = G.list.some(g=>g.cooks) ? `<div class="tare"><b>Before you start:</b> weigh each empty pot, pan or container you'll store the cooked food in and write it down, so you can subtract it when you weigh the finished batch.</div>` : '';
   const okey = date+'|'+key+(only?'|'+only:''), aid = 'm-'+okey.replace(/[^a-z0-9]/gi,'_');
   if(!opts.bare && !ui.mealOpen[okey] && !isSkipped(date,key)){
-    const whoTxt = fam ? 'Family dinner' : key==='b' ? 'Shared breakfast' : key==='l' ? 'Shared lunch' : key==='c' ? 'Every morning' : NAMES[persons[0]];
-    const dotc = fam||key==='l'||key==='b'||key==='c' ? 'var(--accent)' : PC[persons[0]];
+    const whoTxt = ['b2','l2','d2'].includes(key) ? 'Shared · '+persons.map(p=>NAMES[p]).join(' & ') : fam ? 'Family dinner' : key==='b' ? 'Shared breakfast' : key==='l' ? 'Shared lunch' : key==='c' ? 'Every morning' : NAMES[persons[0]];
+    const dotc = fam||['l','b','c','b2','l2','d2'].includes(key) ? 'var(--accent)' : PC[persons[0]];
     const cookToday = key!=='c' && persons.length>1 && date===cyc.start && run[0]===cyc.start;
     return `<button id="${aid}" class="mealrow" data-act="mopen" data-k="${okey}" aria-expanded="false"><span class="pdot" style="--pc:${dotc}"></span><span class="grow1"><span class="small muted">${whoTxt}${run.length>1&&key!=='c'?` · day ${idx+1} of ${run.length}`:''}${cookToday?' · <b style="color:var(--prep)">cook today</b>':''}</span><br><b>${esc(m.n)}</b></span>${r===1?`<span style="color:var(--accent)">${I.up.replace('<svg','<svg width="16" height="16"')}</span>`:''}<span class="chev">›</span></button>`;
   }
@@ -929,28 +935,39 @@ function vWeek(){
 }
 
 // ---------- New day page: a section per person with all their meals ----------
-const SECTIONS = {K:[['Breakfast',['c','kb','b']],['Lunch',['l','kl']],['Dinner',['d']],['Snack',['ks']]], Y:[['Breakfast',['c','yb','b']],['Lunch',['l','yl']],['Dinner',['d']],['Snack',['ys']]]};
+const SECTIONS = {K:[['Breakfast',['c','kb','b','b2']],['Lunch',['l','l2','kl']],['Dinner',['d','d2']],['Snack',['ks']]], Y:[['Breakfast',['c','yb','b','b2']],['Lunch',['l','l2','yl']],['Dinner',['d','d2']],['Snack',['ys']]]};
 // Which meals the adults share (Family settings). Dinner is always the family meal. Claude plans to match.
 // Meals grid: for each person and meal, 'shared', 'own' or 'na' (not eating it). Dinner is shared or N/A; kids only share.
+// Meals grid: for each person and meal, which meal they eat (1 or 2) or 'na'. Same number = same food, cooked once.
+// A number only one adult picks becomes that adult's own meal. Max 2 per meal. Snacks are 'own' or 'na'.
+// Older saves used 'shared'/'own'; they convert so the plan stays exactly the same.
 function mealGrid(){
-  const g = JSON.parse(JSON.stringify((S.settings||{}).meals || {})), old = (S.settings||{}).shared || {};
-  ['K','Y'].forEach(p=>{ g[p] = Object.assign({b: old.b ? 'shared' : 'own', l: old.l===false ? 'own' : 'shared', d:'shared', s: p==='K' ? 'own' : 'na'}, g[p]||{}); });
-  KIDS.forEach(p=>{ g[p] = Object.assign({b:'na', l:'na', d:'shared', s:'na'}, g[p]||{}); });
+  const src = JSON.parse(JSON.stringify((S.settings||{}).meals || {})), old = (S.settings||{}).shared || {}, all = ['K','Y'].concat(KIDS), g = {};
+  ['K','Y'].forEach(p=>{ g[p] = Object.assign({b: old.b ? 'shared' : 'own', l: old.l===false ? 'own' : 'shared', d:'shared', s: p==='K' ? 'own' : 'na'}, src[p]||{}); });
+  KIDS.forEach(p=>{ g[p] = Object.assign({b:'na', l:'na', d:'shared', s:'na'}, src[p]||{}); });
+  MAIN.forEach(m=>{ const used = new Set(); all.forEach(p=>{ const v = g[p][m]; if(v==='1'||v==='2'||v===1||v===2){ g[p][m] = String(v); used.add(g[p][m]); } });
+    if(all.some(p=>g[p][m]==='shared')){ const n = used.has('1') ? '2' : '1'; used.add(n); all.forEach(p=>{ if(g[p][m]==='shared') g[p][m] = n; }); }
+    all.forEach(p=>{ if(g[p][m]==='own'){ const n = !used.has('1') ? '1' : !used.has('2') ? '2' : '2'; used.add(n); g[p][m] = n; } }); });
   return g;
 }
-const SHARED = () => { const g = mealGrid(); return {b: ['K','Y'].some(p=>g[p].b==='shared'), l: ['K','Y'].some(p=>g[p].l==='shared')}; };
-// Who eats each planned slot, from the grid.
-function syncMeals(){ const g = mealGrid(), all = ['K','Y'].concat(KIDS), sh = m => all.filter(p=>g[p][m]==='shared');
-  KEY_PERSONS.b = sh('b'); KEY_PERSONS.l = sh('l'); KEY_PERSONS.d = sh('d');
-  KEY_PERSONS.kb = g.K.b==='own' ? ['K'] : []; KEY_PERSONS.yb = g.Y.b==='own' ? ['Y'] : [];
-  KEY_PERSONS.kl = g.K.l==='own' ? ['K'] : []; KEY_PERSONS.yl = g.Y.l==='own' ? ['Y'] : [];
+const SHARED = () => ({b: !!(KEY_PERSONS.b||[]).length, l: !!(KEY_PERSONS.l||[]).length});
+// Which planned slot each person eats for each meal. A group of one adult uses that adult's own slot (kb/yb, kl/yl);
+// other groups use the shared slot, then the second one (b2/l2/d2).
+const SLOT_OF = {};
+function syncMeals(){ const g = mealGrid(), all = ['K','Y'].concat(KIDS), own = {K:{b:'kb',l:'kl'}, Y:{b:'yb',l:'yl'}};
+  ['b','b2','kb','yb','l','l2','kl','yl','d','d2'].forEach(k=>{ KEY_PERSONS[k] = []; }); all.forEach(p=>{ SLOT_OF[p] = {}; });
+  MAIN.forEach(m=>{ const groups = {}; all.forEach(p=>{ const v = g[p][m]; if(v && v!=='na') (groups[v] = groups[v]||[]).push(p); });
+    let base = 0; Object.keys(groups).sort().forEach(n=>{ const who = groups[n];
+      const key = who.length===1 && own[who[0]] && own[who[0]][m] ? own[who[0]][m] : (base++ ? m+'2' : m);
+      KEY_PERSONS[key] = KEY_PERSONS[key].concat(who); who.forEach(p=>{ SLOT_OF[p][m] = key; }); }); });
   KEY_PERSONS.ks = g.K.s==='own' ? ['K'] : []; KEY_PERSONS.ys = g.Y.s==='own' ? ['Y'] : [];
 }
+
 // Slots that always show on a person's day (as Flex/Out when empty), based on what's shared.
 // A day that was planned before the setting changed keeps its own layout.
-const baseKeys = p => { const g = mealGrid()[p]||{}, day = S.plan.days[ui.sel]||{}, has = k => MEALS[day[k]], own = {b:p==='K'?'kb':'yb', l:p==='K'?'kl':'yl'};
-  const pick = m => has(m) && KEY_PERSONS[m].includes(p) ? m : has(own[m]) ? own[m] : g[m]==='shared' ? m : g[m]==='own' ? own[m] : null;
-  return ['d', pick('l'), pick('b')].filter(Boolean); };
+const baseKeys = p => { const day = S.plan.days[ui.sel]||{}, mine = k => MEALS[day[k]] && KEY_PERSONS[k].includes(p);
+  const pick = m => [m, m+'2', p==='K'?'k'+m:'y'+m].find(mine) || (SLOT_OF[p]||{})[m] || null;
+  return [pick('d'), pick('l'), pick('b')].filter(Boolean); };
 // Serving table for a shared meal: one row per part of the meal, one column per person eating it.
 // "Both of us" view: one table per shared meal (everyone's column, even when someone isn't eating it), with the recipe one tap away.
 function servingCard(d,k,label){
@@ -1013,7 +1030,7 @@ function vDay2(){
       return `<button class="slothead" data-act="slotopen" data-k="${esc(sk)}" aria-expanded="${open}"><span class="grow1"><b>${label}</b><br><span class="small muted">${esc(names)}</span></span><span class="chev" style="${open?'transform:rotate(90deg)':''}">›</span></button>${open?`<div class="slotbody">${items}</div>`:''}`; }).join('');
     return `<section class="slot psec" style="--pc:${PC[p]}"><h2 class="pname"><span class="pdot"></span>${NAMES[p]}</h2>${parts}</section>`; };
   // Both of us: just the shared meals as serving tables. Just me: my own section.
-  if(S.view.mode==='both') return head + seg + lockb + wk + banners + mac + (MEALS[day.b] ? servingCard(d,'b','Breakfast') : '') + (SHARED().l || MEALS[day.l] ? servingCard(d,'l','Lunch') : '') + servingCard(d,'d','Dinner');
+  if(S.view.mode==='both') return head + seg + lockb + wk + banners + mac + [['b','Breakfast'],['b2','Breakfast 2'],['l','Lunch'],['l2','Lunch 2'],['d','Dinner'],['d2','Dinner 2']].filter(([k])=>MEALS[day[k]] || (k==='l' && SHARED().l) || k==='d').map(([k,l])=>servingCard(d,k,l)).join('');
   return head + seg + lockb + wk + banners + mac + ppl.map(section).join('');
 }
 
@@ -1482,6 +1499,9 @@ document.addEventListener('click', e=>{
   else if(a==='shared'){ S.settings.shared = Object.assign({}, SHARED(), {[t.dataset.k]:t.dataset.v==='1'}); changed('Shared meals'); render(); }
   else if(a==='kidopen'){ ui.kidOpen = Object.assign({}, ui.kidOpen, {[t.dataset.p]:!(ui.kidOpen||{})[t.dataset.p]}); render(); }
   else if(a==='kidday'){ const k = kidsList().map(x=>Object.assign({},x)); const x = k.find(y=>y.id===t.dataset.p); if(!x) return; x.daily = Math.max(600, Math.min(3200, kidDaily(x.id) + +t.dataset.d)); delete x.adj; S.settings.kids = k; changed('Family'); render(); }
+  else if(a==='mealnote'){ mealNoteSheet(t.dataset.p, t.dataset.m); }
+  else if(a==='notetag'){ const k = t.dataset.k, all = Object.assign({}, S.settings.mealNotes), n = Object.assign({tags:[], note:''}, all[k]); n.tags = n.tags.includes(t.dataset.t) ? n.tags.filter(x=>x!==t.dataset.t) : n.tags.concat(t.dataset.t); all[k] = n; S.settings.mealNotes = all; t.classList.toggle('on'); }
+  else if(a==='notesave'){ const k = t.dataset.k, all = Object.assign({}, S.settings.mealNotes), n = Object.assign({tags:[], note:''}, all[k]); n.note = (document.getElementById('note-'+k.replace('|','_')).value||'').trim(); all[k] = n; S.settings.mealNotes = all; changed('Meal notes'); closeSheet(); render(); toast('Saved. Claude plans around it.'); }
   else if(a==='pcolor'){ const p = t.dataset.p; if(p!==S.view.me && !KIDS.includes(p)) return; if(colorTaken(p,+t.dataset.i)){ toast('That color is taken.'); return; } S.settings.colors = Object.assign({}, S.settings.colors, {[p]:+t.dataset.i}); changed('Settings'); render(); }
   else if(a==='theme'){ lsSet('mp-theme', t.dataset.v==='auto'?null:t.dataset.v); applyTheme(); render(); }
   else if(a==='weekend'){ S.settings.weekend = t.dataset.v; changed('Settings'); render(); }
@@ -1672,6 +1692,12 @@ let rmArm = null;
 function confirmRm(x){ if(rmArm===x.id){ rmArm = null; return true; } rmArm = x.id; toast('Tap Remove again to remove '+x.name+'.'); setTimeout(()=>{ if(rmArm===x.id) rmArm = null; }, 4000); return false; }
 // Card header used across Family settings: name on the left, summary and Show/Hide on the right.
 const famHead = (act, attrs, open, left, right) => `<div class="row between" data-act="${act}" ${attrs} role="button" tabindex="0" aria-expanded="${open}" style="cursor:pointer;gap:10px">${left}<span class="row" style="gap:8px;flex:none"><span class="small muted">${right}</span><span style="color:var(--accent);font-weight:700;font-size:13px">${open?'Hide':'Show'}</span></span></div>`;
+const NOTE_TAGS = ['Eaten at work','Reheats well','Eat cold','No microwave','Packable','Quick to eat','Kid lunchbox'];
+function mealNoteSheet(p,m){ const key = p+'|'+m, n = (S.settings.mealNotes||{})[key] || {tags:[], note:''}, ML = {b:'Breakfast', l:'Lunch', d:'Dinner', s:'Snack'};
+  openSheet(`<div class="row between"><h2>${esc(NAMES[p])} · ${ML[m]}</h2><button class="iconbtn" data-act="closeSheet" aria-label="Close">${I.x}</button></div>
+    <div class="chips" style="margin:10px 0">${NOTE_TAGS.map(t=>`<button class="chip ${n.tags.includes(t)?'on':''}" data-act="notetag" data-k="${key}" data-t="${esc(t)}">${t}</button>`).join('')}</div>
+    <textarea class="textin" id="note-${key.replace('|','_')}" rows="3" placeholder="Anything else? e.g. microwave line at work is long, prefer cold" style="width:100%;box-sizing:border-box">${esc(n.note||'')}</textarea>
+    <button class="btn primary block" style="margin-top:10px" data-act="notesave" data-k="${key}">Save</button>`); }
 function vFamily(){
   if(KIDS.includes(S.view.me)) return `<h2 style="font-size:22px">Family settings</h2><div class="card muted">Parents manage family settings.</div>`;
   const kidCard = k => { const b = kidBand(k), a = ageYears(k.dob);
@@ -1685,15 +1711,19 @@ function vFamily(){
         <span class="note">Recommended by age (${b[1]}: about ${b[2].toLocaleString()} cal a day). Each meal they share is a third: about ${kidKcal(k.id)} cal${kidMeat(k.id)?`, with at least ${wt(kidMeat(k.id))} cooked meat at dinner`:''}. Use − and + to fit your child's appetite.</span></div>
       <button class="linkbtn" style="color:var(--bad)" data-act="kidrm" data-p="${k.id}">Remove ${esc(k.name)}</button></div>`; };
   const g = mealGrid(), ppl = ['K','Y'].concat(KIDS), so = !!ui.famShared;
-  const OPTS = {b:[['shared','Shared'],['own','Own'],['na','N/A']], l:[['shared','Shared'],['own','Own'],['na','N/A']], d:[['shared','Shared'],['na','N/A']], s:[['own','Own'],['na','N/A']]};
-  const cell = (p,m) => { const o = isKid(p) ? OPTS[m].filter(x=>x[0]!=='own') : OPTS[m]; if(!o.length || (isKid(p) && m==='s')) return '<td class="muted">—</td>';
-    return `<td><select class="mealsel" data-act="mealset" data-p="${p}" data-m="${m}" aria-label="${NAMES[p]} ${m}">${o.map(([v,l])=>`<option value="${v}" ${g[p][m]===v?'selected':''}>${l}</option>`).join('')}</select></td>`; };
+  const ML = {b:'Breakfast', l:'Lunch', d:'Dinner', s:'Snack'};
+  const OPTS = m => m==='s' ? [['own','Own'],['na','None']] : [['1',ML[m]+' 1'],['2',ML[m]+' 2'],['na','None']];
+  const cell = (p,m) => { if(isKid(p) && m==='s') return '<td class="muted">—</td>';
+    const n = (S.settings.mealNotes||{})[p+'|'+m], has = n && ((n.tags||[]).length || n.note);
+    return `<td><select class="mealsel" data-act="mealset" data-p="${p}" data-m="${m}" aria-label="${NAMES[p]} ${ML[m]}">${OPTS(m).map(([v,l])=>`<option value="${v}" ${String(g[p][m])===v?'selected':''}>${l}</option>`).join('')}</select>
+      ${g[p][m]!=='na' ? `<button class="notebtn ${has?'on':''}" data-act="mealnote" data-p="${p}" data-m="${m}" aria-label="Notes for ${NAMES[p]} ${ML[m]}">${has?'✓ Notes':'+ Notes'}</button>` : ''}</td>`; };
+  const cook = MAIN.map(m=>{ const n = new Set(ppl.map(p=>g[p][m]).filter(v=>v!=='na')).size; return n ? `${ML[m]}: ${n} recipe${n>1?'s':''}` : ''; }).filter(Boolean).join(' · ');
   const per = p => isKid(p) ? `${kidKcal(p)} cal each` : `${Math.round((S.macros[p].kcal - 0)/mealsOf(p)).toLocaleString()} cal each`;
   const shared = `<div class="card" style="margin-top:8px">${famHead('famshared', '', so, `<div class="pname" style="font-size:18px">Meals</div>`, 'Who eats what')}
     ${so ? `<div class="tblwrap"><table class="stbl mgrid"><thead><tr><th></th>${ppl.map(p=>`<th>${avatar(p,ppl)}</th>`).join('')}</tr></thead><tbody>
       ${[['b','Breakfast'],['l','Lunch'],['d','Dinner'],['s','Snack']].map(([m,l])=>`<tr><td>${l}</td>${ppl.map(p=>cell(p,m)).join('')}</tr>`).join('')}
       <tr><td class="small muted">Per meal</td>${ppl.map(p=>`<td class="small muted">${mealsOf(p)} meal${mealsOf(p)>1?'s':''}<br>~${isKid(p)?kidKcal(p):Math.round(S.macros[p].kcal/mealsOf(p)).toLocaleString()} cal</td>`).join('')}</tr></tbody></table></div>
-      <span class="note">Shared = one recipe for everyone marked shared. Own = a separate meal just for that person. N/A = not eating it. Adults' daily calories are split evenly across the breakfast, lunch and dinner they eat (the latte and snacks come off the top). Kids get a third of their daily calories per meal. Claude plans new weeks to match.</span>` : ''}</div>`;
+      <p class="small" style="margin:8px 0 4px"><b>To cook:</b> ${cook}</p><span class="note">Same number = same food, cooked once and split by weight. A number only one person picks is their own meal. None = not eating it. Add notes for details like eaten at work or no microwave; Claude plans around them. Adults' daily calories are split evenly across the breakfast, lunch and dinner they eat (the latte and snacks come off the top). Kids get a third of their daily calories per meal. Claude plans new weeks to match.</span>` : ''}</div>`;
   return `<h2 style="font-size:22px">Family settings</h2>` + shared + vMacros().replace('<h2 style="font-size:22px">Daily targets</h2>','<h2 style="font-size:17px;margin-top:10px">Adults · daily targets</h2>').replace(`<p class="note">Kids' dinner portions are in Family settings.</p>`,'') + `<h2 style="font-size:17px;margin-top:18px">Kids</h2>${kidsList().map(kidCard).join('')}
     ${kidsList().length>=MAX_KIDS ? `<p class="note">Households can have up to 2 adults and ${MAX_KIDS} kids.</p>` : `<div class="card" style="margin-top:8px"><form class="addform" data-form="kid" style="margin:0"><input id="kid-name" placeholder="Child's name" aria-label="Child's name"><button class="btn primary" type="submit">+ Add child</button></form><span class="note">Kids get the family dinner, portioned for their age. Up to 2 adults and ${MAX_KIDS} kids.</span></div>`}`;
 }
@@ -1717,6 +1747,10 @@ function squarePhoto(file){ return new Promise((ok,no)=>{ const r = new FileRead
 // ---------- What's new ----------
 // Newest first. Each person sees a release once, the next time they open the app; Dev and the live app track it separately.
 const RELEASES = [
+  {v:'2026-11-21f', title:"What's new", items:[
+    'Meals grid now uses numbers: same number = same food. Two people can share one lunch while two others share a different one.',
+    'Tap + Notes under any meal to add details like eaten at work, eat cold or no microwave. Claude plans around them.',
+    'Add the app to your Home Screen: in Safari, tap Share, then Add to Home Screen.']},
   {v:'2026-11-21c', title:"What's new", items:[
     'New Meals grid in Family settings: for each person, pick Shared, Own or N/A for breakfast, lunch, dinner and snack.',
     'Your daily calories are now split evenly across the meals you eat. The latte and snacks come off the top.',
