@@ -311,7 +311,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-21dev13';
+const APP_VERSION = '2026-11-21dev14';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -795,7 +795,7 @@ function personSummary(date,p){
   const a = dayMacros(date,p), t = targets(p), pct = (x,y) => Math.min(100, Math.round(x/y*100));
   const row = (lbl,x,y) => `<div class="mrow"><b>${lbl}</b><div class="bar"><i style="width:${pct(x,y)}%"></i></div><span class="v">${Math.round(x)}/${Math.round(y)}g</span></div>`;
   return `<div class="p" style="--pc:${PC[p]}"><div class="pname"><span class="pdot"></span>${NAMES[p]}</div>
-    <div class="kcal">${Math.round(a.k).toLocaleString()} / ${t.k.toLocaleString()} cal</div><div class="bar"><i style="width:${pct(a.k,t.k)}%"></i></div>
+    <div class="kcal">${Math.round(a.k).toLocaleString()} / ${t.k.toLocaleString()} cal ${(()=>{ const tl = tolOf(p)[2], off = t.k ? Math.round((a.k-t.k)/t.k*100) : 0; return Math.abs(off)<=tl ? `<span class="small" style="color:var(--good)">· on target</span>` : `<span class="small" style="color:var(--warn)">· ${Math.abs(off)}% ${off<0?'under':'over'}</span>`; })()}</div><div class="bar"><i style="width:${pct(a.k,t.k)}%"></i></div>
     ${row('P',a.p,t.p)}${row('C',a.c,t.c)}${row('F',a.f,t.f)}</div>`;
 }
 
@@ -1283,6 +1283,11 @@ function vPantry(){
     <p class="note">Tap roughly how much is left. Recipes that need more than you have put it on the grocery list; close calls show under Check before you shop. You can also edit the Pantry tab in the Google Sheet.</p>`;
 }
 
+// How close each adult's day should land to their targets. Saved in settings so Claude's planning uses it too.
+const TOL = [['relaxed','Relaxed',15,'Most variety, fewest swaps. Fine for general health.'],['balanced','Balanced',10,'Close enough to see results without weighing everything.'],['strict','Strict',5,'For cutting or bulking. Fewer recipes fit, more swaps and weighing.']];
+const tolOf = p => TOL.find(t=>t[0]===((S.settings.tol||{})[p]||'balanced'));
+function tolField(p){ const cur = tolOf(p);
+  return `<div class="field" style="margin-top:12px"><span class="lbl">How close to targets</span><div class="seg">${TOL.map(t=>`<button class="${cur[0]===t[0]?'on':''}" data-act="tol" data-p="${p}" data-v="${t[0]}">${t[1]} ±${t[2]}%</button>`).join('')}</div><span class="note">${cur[3]}</span></div>`; }
 function vMacros(){
   const card = p => { const m = S.macros[p], cal = {p:4,c:4,f:4};
     const g = k => Math.round(m.kcal*m[k]/100/(k==='f'?9:4));
@@ -1296,7 +1301,7 @@ function vMacros(){
       <table class="mtable" style="margin-top:8px"><tr><th>Daily</th><th>Percent</th><th>Grams</th></tr>
       <tr><td>Calories</td><td colspan="2"><input id="m-${p}-kcal" inputmode="numeric" data-act="mac" data-p="${p}" data-f="kcal" value="${m.kcal}" aria-label="${NAMES[p]} calories"><span class="unit">cal</span></td></tr>
       ${[['p','Protein'],['c','Carbs'],['f','Fat']].map(([k,l])=>`<tr><td>${l}</td><td><input id="m-${p}-${k}" inputmode="decimal" data-act="mac" data-p="${p}" data-f="${k}" value="${m[k]}" aria-label="${NAMES[p]} ${l} percent"><span class="unit">%</span></td><td><input id="m-${p}-${k}g" inputmode="numeric" data-act="macg" data-p="${p}" data-f="${k}" value="${g(k)}" aria-label="${NAMES[p]} ${l} grams"><span class="unit">g</span></td></tr>`).join('')}
-      </table></div></div>`; };
+      </table>${tolField(p)}</div></div>`; };
   return `<h2 style="font-size:22px">Daily targets</h2><p class="note" style="margin:-6px 0 0">Enter your weight and goal to fill these in. Change a percent or grams and the other updates. Portions in the calendar rescale to match.</p>` + card('K') + card('Y') + `<p class="note">Kids' dinner portions are in Family settings.</p>`;
 }
 
@@ -1446,6 +1451,7 @@ document.addEventListener('click', e=>{
   else if(a==='kidband'){ const k = kidsList().map(x=>Object.assign({},x)); const x = k.find(y=>y.id===t.dataset.p); if(!x) return; x.band = t.dataset.v; S.settings.kids = k; changed('Family'); render(); }
   else if(a==='kidadj'){ const k = kidsList().map(x=>Object.assign({},x)); const x = k.find(y=>y.id===t.dataset.p); if(!x) return; x.adj = Math.max(-200, Math.min(200, (x.adj||0) + +t.dataset.d)); S.settings.kids = k; changed('Family'); render(); }
   else if(a==='kidrm'){ const x = kidOf(t.dataset.p); if(!x || !confirmRm(x)) return; S.settings.kids = kidsList().filter(y=>y.id!==x.id); changed('Family'); render(); toast(x.name+' removed. Dinners rescale for everyone else.'); }
+  else if(a==='tol'){ S.settings.tol = Object.assign({}, S.settings.tol, {[t.dataset.p]:t.dataset.v}); changed('Macros'); render(); }
   else if(a==='pcolor'){ const p = t.dataset.p; if(p!==S.view.me && !KIDS.includes(p)) return; S.settings.colors = Object.assign({}, S.settings.colors, {[p]:+t.dataset.i}); changed('Settings'); render(); }
   else if(a==='theme'){ lsSet('mp-theme', t.dataset.v==='auto'?null:t.dataset.v); applyTheme(); render(); }
   else if(a==='weekend'){ S.settings.weekend = t.dataset.v; changed('Settings'); render(); }
