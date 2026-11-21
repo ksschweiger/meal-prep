@@ -244,7 +244,7 @@ details.cmp[open] summary::after{transform:rotate(90deg)}
 
 /* Nav */
 .tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
-.tabs .wrap{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));padding-block:4px}
+.tabs .wrap{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);padding-block:4px}
 .tabs button{border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;font-size:11px;font-weight:700;color:var(--muted)}
 .tabs button svg{width:22px;height:22px}
 .tabs button.on{color:var(--accent)}
@@ -311,7 +311,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-21dev16';
+const APP_VERSION = '2026-11-21dev17';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
