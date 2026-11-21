@@ -1,5 +1,7 @@
 # Dev and release process
 
+**Current mode (Nov 21, 2026): changes go straight to production (`index.html`).** Use Dev only when Kaleb asks to build in Dev; before starting, copy `index.html` into `dev/index.html` and re-add the DEV banner.
+
 - **Production:** https://ksschweiger.github.io/meal-prep/ (`index.html`)
 - **Dev:** https://ksschweiger.github.io/meal-prep/dev/ (`dev/index.html`, purple DEV banner)
 
