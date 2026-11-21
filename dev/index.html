@@ -142,7 +142,8 @@ main{padding-block:14px 110px}
 .mepop button.on,.mepop button:active{background:var(--sunk)}
 .meav{background:none;border:0;padding:0;margin-left:8px;cursor:pointer;display:flex}
 .pitem{background:none;border:0;padding:0;font:inherit;color:inherit;text-align:left;cursor:pointer}
-.swatch{width:22px;height:22px;border-radius:50%;background:var(--sw);border:2px solid var(--surface);box-shadow:0 0 0 1px var(--line);padding:0;cursor:pointer}.swatch.on{box-shadow:0 0 0 2px var(--ink)}
+.swatch{width:22px;height:22px;border-radius:50%;background:var(--sw);border:2px solid var(--surface);box-shadow:0 0 0 1px var(--line);padding:0;cursor:pointer}.swatch.taken{opacity:.25;cursor:not-allowed}
+.swatch.on{box-shadow:0 0 0 2px var(--ink)}
 .av{overflow:hidden;display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:30px;padding:0 6px;border-radius:999px;background:var(--pc);color:var(--surface);font:700 12.5px var(--body)}
 .stbl td.amt{font-family:var(--mono);font-size:13px;text-align:center;white-space:nowrap}
 .prow{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-top:1px solid var(--line)}
@@ -311,7 +312,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-21dev17';
+const APP_VERSION = '2026-11-21dev18';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -337,8 +338,8 @@ function spoonAmt(amt,unit,lb){
 }
 const STYLE_COLOR = {Cozy:'var(--s-cozy)',Asian:'var(--s-asian)',Mexican:'var(--s-mexican)',Mediterranean:'var(--s-med)'};
 const KEY_SLOT = {c:'coffee',kb:'breakfast',l:'lunch',ks:'snack',yb:'breakfast',ys:'snack',d:'dinner'};
-const KEY_PERSONS = {c:['K','Y'],kb:['K'],l:['K','Y'],ks:['K'],yb:['Y'],ys:['Y'],d:['K','Y','L']};
-const PERSON_KEYS = {K:['c','kb','l','d','ks'],Y:['c','yb','l','d','ys']};
+const KEY_PERSONS = {c:['K','Y'],kb:['K'],b:['K','Y'],l:['K','Y'],kl:['K'],yl:['Y'],ks:['K'],yb:['Y'],ys:['Y'],d:['K','Y','L']};
+const PERSON_KEYS = {K:['c','kb','b','l','kl','d','ks'],Y:['c','yb','b','l','yl','d','ys']};
 const NAMES = {K:'Kaleb',Y:'Kayla',L:'Landen'};
 const PC = {K:'var(--k)',Y:'var(--y)',L:'var(--l)'};
 // Letter shown on portion labels (internal codes stay K/Y/L): H = husband (Kaleb), W = wife (Kayla).
@@ -494,7 +495,7 @@ const isAway = (d,p) => ((S.plan.days[d]||{}).away||[]).includes(p);
 function isFlex(d,k){ if(k==='ys') return true; if(S.plan.days[d] && !MEALS[S.plan.days[d][k]]) return true; // unknown or "none" recipe = nothing planned
   if(!eaters(d,k).length) return true; if(((S.plan.days[d]||{}).flex||[]).includes(k)) return true; if(k==='c') return false; if(S.plan.days[d] && S.plan.days[d].off) return true; if(!isWeekend(d)) return false; const m = S.settings.weekend; return m==='none' || ((m==='light'||m==='sun') && k!=='d'); }
 
-const ui = {macOpen:{K:true,Y:true}, mealOpen:{}, tab:'calendar', sel:TODAY, ym:[pd(TODAY).getFullYear(), pd(TODAY).getMonth()], gc:null, ptab:'freezer'};
+const ui = {macOpen:{}, mealOpen:{}, tab:'calendar', sel:TODAY, ym:[pd(TODAY).getFullYear(), pd(TODAY).getMonth()], gc:null, ptab:'freezer'};
 
 // ---------- Math ----------
 const cg = (c,p) => p==='K' ? c[1] : p==='Y' ? c[2] : c[2]*.3; // Landen's real amount comes from raw() below
@@ -652,7 +653,7 @@ function pullForward(w){
 }
 // A shopping week runs from the shop day's dinner to the next shop day's lunch (pickup is midday).
 // One trip a week by default. With settings.freshTrip on, produce used from day 4 on goes on a lighter midweek trip.
-const MORNING = ['kb','yb','l'];
+const MORNING = ['kb','yb','b','l','kl','yl'];
 function needsRange(start,end,shopWeek,noCarry){
   const need = {}, late = {}, spices = new Set(), meals = new Set(), use = {}, when = {};
   const last = shopWeek ? add(end,1) : end, mid = add(start,3);
@@ -809,7 +810,7 @@ function mealCard(date,key,only,opts){
   opts = opts||{};
   const G = groups(date,key), m = G.meal, persons = KEY_PERSONS[key], fam = key==='d', r = myVote(G.id);
   const run = G.run, idx = run.indexOf(date), cyc = S.plan.cycles[cycleOf(run[0])];
-  const who = fam ? `<div class="who" style="--pc:var(--accent)">Family dinner</div>` : key==='l' ? `<div class="who" style="--pc:var(--accent)">Shared lunch · Kaleb & Kayla</div>` : key==='c' ? `<div class="who" style="--pc:var(--accent)">Both of you · every morning</div>` : `<div class="who" style="--pc:${PC[persons[0]]}"><span class="pdot"></span>${NAMES[persons[0]]}</div>`;
+  const who = fam ? `<div class="who" style="--pc:var(--accent)">Family dinner</div>` : key==='b' ? `<div class="who" style="--pc:var(--accent)">Shared breakfast · Kaleb & Kayla</div>` : key==='l' ? `<div class="who" style="--pc:var(--accent)">Shared lunch · Kaleb & Kayla</div>` : key==='c' ? `<div class="who" style="--pc:var(--accent)">Both of you · every morning</div>` : `<div class="who" style="--pc:${PC[persons[0]]}"><span class="pdot"></span>${NAMES[persons[0]]}</div>`;
   const tags = (m.style?`<span class="tag style" style="--sc:${STYLE_COLOR[m.style]}">${m.style}</span>`:'')+`<span class="tag">${m.tool}</span>`+(run.length>1&&key!=='c'?`<span class="tag">Day ${idx+1} of ${run.length}</span>`:'')+[[1,'👍'],[-1,'👎']].map(([v,e])=>{ const w = Object.keys(votesOf(G.id)).filter(p=>p!==S.view.me && votesOf(G.id)[p]===v).map(p=>p==='?'?'someone':NAMES[p]); return w.length?`<span class="tag">${e} ${esc(w.join(', '))}</span>`:''; }).join('');
   // only = a person's section on the new day page: show just their portion (Kayla's dinner also shows Landen's).
   const vis = only ? eaters(date,key).filter(x=>x===only || (only==='Y' && isKid(x))) : eaters(date,key).filter(shows);
@@ -835,8 +836,8 @@ function mealCard(date,key,only,opts){
   const tareTip = G.list.some(g=>g.cooks) ? `<div class="tare"><b>Before you start:</b> weigh each empty pot, pan or container you'll store the cooked food in and write it down, so you can subtract it when you weigh the finished batch.</div>` : '';
   const okey = date+'|'+key+(only?'|'+only:''), aid = 'm-'+okey.replace(/[^a-z0-9]/gi,'_');
   if(!opts.bare && !ui.mealOpen[okey] && !isSkipped(date,key)){
-    const whoTxt = fam ? 'Family dinner' : key==='l' ? 'Shared lunch' : key==='c' ? 'Every morning' : NAMES[persons[0]];
-    const dotc = fam||key==='l'||key==='c' ? 'var(--accent)' : PC[persons[0]];
+    const whoTxt = fam ? 'Family dinner' : key==='b' ? 'Shared breakfast' : key==='l' ? 'Shared lunch' : key==='c' ? 'Every morning' : NAMES[persons[0]];
+    const dotc = fam||key==='l'||key==='b'||key==='c' ? 'var(--accent)' : PC[persons[0]];
     const cookToday = key!=='c' && persons.length>1 && date===cyc.start && run[0]===cyc.start;
     return `<button id="${aid}" class="mealrow" data-act="mopen" data-k="${okey}" aria-expanded="false"><span class="pdot" style="--pc:${dotc}"></span><span class="grow1"><span class="small muted">${whoTxt}${run.length>1&&key!=='c'?` · day ${idx+1} of ${run.length}`:''}${cookToday?' · <b style="color:var(--prep)">cook today</b>':''}</span><br><b>${esc(m.n)}</b></span>${r===1?`<span style="color:var(--accent)">${I.up.replace('<svg','<svg width="16" height="16"')}</span>`:''}<span class="chev">›</span></button>`;
   }
@@ -926,7 +927,15 @@ function vWeek(){
 }
 
 // ---------- New day page: a section per person with all their meals ----------
-const SECTIONS = {K:[['Breakfast',['c','kb']],['Lunch',['l']],['Dinner',['d']],['Snack',['ks']]], Y:[['Breakfast',['c','yb']],['Lunch',['l']],['Dinner',['d']],['Snack',['ys']]]};
+const SECTIONS = {K:[['Breakfast',['c','kb','b']],['Lunch',['l','kl']],['Dinner',['d']],['Snack',['ks']]], Y:[['Breakfast',['c','yb','b']],['Lunch',['l','yl']],['Dinner',['d']],['Snack',['ys']]]};
+// Which meals the adults share (Family settings). Dinner is always the family meal. Claude plans to match.
+const SHARED = () => Object.assign({b:false, l:true}, S.settings.shared||{});
+// Slots that always show on a person's day (as Flex/Out when empty), based on what's shared.
+// A day that was planned before the setting changed keeps its own layout.
+const baseKeys = p => { const sh = SHARED(), day = S.plan.days[ui.sel]||{}, has = k => MEALS[day[k]];
+  const lunch = has('l') ? 'l' : has(p==='K'?'kl':'yl') ? (p==='K'?'kl':'yl') : sh.l ? 'l' : (p==='K'?'kl':'yl');
+  const bfast = has('b') ? 'b' : has(p==='K'?'kb':'yb') ? (p==='K'?'kb':'yb') : sh.b ? 'b' : (p==='K'?'kb':'yb');
+  return ['d', lunch, bfast]; };
 // Serving table for a shared meal: one row per part of the meal, one column per person eating it.
 // "Both of us" view: one table per shared meal (everyone's column, even when someone isn't eating it), with the recipe one tap away.
 function servingCard(d,k,label){
@@ -978,18 +987,18 @@ function vDay2(){
   const empty = (txt,sub) => `<div class="mealrow" style="border-style:dashed;box-shadow:none"><span class="grow1"><b>${txt}</b><br><span class="small muted">${sub}</span></span></div>`;
   const section = p => {
     if(isAway(d,p)) return `<section class="slot psec" style="--pc:${PC[p]}"><h2 class="pname"><span class="pdot"></span>${NAMES[p]}</h2>${empty('Away today','Nothing planned.')}</section>`;
-    const parts = SECTIONS[p].map(([label,keys])=>{ const items = keys.filter(k=>KEY_PERSONS[k].includes(p) && (['l','d','kb','yb'].includes(k) || (day[k] && day[k]!=='none' && !isFlex(d,k)))).map(k=>{
+    const parts = SECTIONS[p].map(([label,keys])=>{ const items = keys.filter(k=>KEY_PERSONS[k].includes(p) && (baseKeys(p).includes(k) || (day[k] && day[k]!=='none' && !isFlex(d,k)))).map(k=>{
         if(!eaters(d,k).includes(p)) return isFlex(d,k) ? empty('Flex','Eat leftovers from the week first, then whatever fits the day.') : empty('Out','Not eating this one at home.');
         if(isFlex(d,k)) return empty('Flex','Eat leftovers from the week first, then whatever fits the day.');
         return mealCard(d,k,p); }).join('');
       if(!items) return '';
       // Collapsed by default: the header shows what's in it; tap to open.
       const sk = d+'|'+p+'|'+label, open = !!(ui.slotOpen||{})[sk];
-      const names = keys.filter(k=>KEY_PERSONS[k].includes(p) && (['l','d','kb','yb'].includes(k) || (day[k] && day[k]!=='none' && !isFlex(d,k)))).map(k=>!eaters(d,k).includes(p) ? (isFlex(d,k)?'Flex':'Out') : isFlex(d,k) ? 'Flex' : (MEALS[day[k]].s||MEALS[day[k]].n)).join(' · ');
+      const names = keys.filter(k=>KEY_PERSONS[k].includes(p) && (baseKeys(p).includes(k) || (day[k] && day[k]!=='none' && !isFlex(d,k)))).map(k=>!eaters(d,k).includes(p) ? (isFlex(d,k)?'Flex':'Out') : isFlex(d,k) ? 'Flex' : (MEALS[day[k]].s||MEALS[day[k]].n)).join(' · ');
       return `<button class="slothead" data-act="slotopen" data-k="${esc(sk)}" aria-expanded="${open}"><span class="grow1"><b>${label}</b><br><span class="small muted">${esc(names)}</span></span><span class="chev" style="${open?'transform:rotate(90deg)':''}">›</span></button>${open?`<div class="slotbody">${items}</div>`:''}`; }).join('');
     return `<section class="slot psec" style="--pc:${PC[p]}"><h2 class="pname"><span class="pdot"></span>${NAMES[p]}</h2>${parts}</section>`; };
   // Both of us: just the shared meals as serving tables. Just me: my own section.
-  if(S.view.mode==='both') return head + seg + lockb + wk + banners + mac + servingCard(d,'l','Lunch') + servingCard(d,'d','Dinner');
+  if(S.view.mode==='both') return head + seg + lockb + wk + banners + mac + (SHARED().b ? servingCard(d,'b','Breakfast') : '') + (SHARED().l ? servingCard(d,'l','Lunch') : '') + servingCard(d,'d','Dinner');
   return head + seg + lockb + wk + banners + mac + ppl.map(section).join('');
 }
 
@@ -1456,7 +1465,10 @@ document.addEventListener('click', e=>{
   else if(a==='tol'){ S.settings.tol = Object.assign({}, S.settings.tol, {[t.dataset.p]:t.dataset.v}); changed('Macros'); render(); }
   else if(a==='seenNew'){ S.seen = Object.assign({}, S.seen, {[seenKey()]:RELEASES[0].v}); save(); closeSheet(); }
   else if(a==='whatsnew'){ ui.menu = false; render(); showWhatsNew(true); }
-  else if(a==='pcolor'){ const p = t.dataset.p; if(p!==S.view.me && !KIDS.includes(p)) return; S.settings.colors = Object.assign({}, S.settings.colors, {[p]:+t.dataset.i}); changed('Settings'); render(); }
+  else if(a==='famshared'){ ui.famShared = !ui.famShared; render(); }
+  else if(a==='shared'){ S.settings.shared = Object.assign({}, SHARED(), {[t.dataset.k]:t.dataset.v==='1'}); changed('Shared meals'); render(); }
+  else if(a==='kidopen'){ ui.kidOpen = Object.assign({}, ui.kidOpen, {[t.dataset.p]:!(ui.kidOpen||{})[t.dataset.p]}); render(); }
+  else if(a==='pcolor'){ const p = t.dataset.p; if(p!==S.view.me && !KIDS.includes(p)) return; if(colorTaken(p,+t.dataset.i)){ toast('That color is taken.'); return; } S.settings.colors = Object.assign({}, S.settings.colors, {[p]:+t.dataset.i}); changed('Settings'); render(); }
   else if(a==='theme'){ lsSet('mp-theme', t.dataset.v==='auto'?null:t.dataset.v); applyTheme(); render(); }
   else if(a==='weekend'){ S.settings.weekend = t.dataset.v; changed('Settings'); render(); }
   else if(a==='shopday'){ const i = +t.dataset.i, cur = shopDaysOf().slice(); const nx = cur.includes(i) ? cur.filter(x=>x!==i) : cur.concat(i).sort(); if(!nx.length) return; S.settings.shopDays = nx; S.settings.shopDay = nx[0]; ui.gc = null; changed('Settings'); render(); toast(`Shopping days: ${nx.map(x=>DOW[x]).join(' and ')}. Each trip covers the meals cooked before the next one.`); }
@@ -1630,6 +1642,9 @@ function applyColors(){
   Object.keys(PVAR).forEach((p,i)=>{ const sw = PALETTE[c[p]!==undefined ? c[p] : (['K','Y','L'].includes(p) ? -1 : (i+3)%PALETTE.length)]; if(sw) st.setProperty(PVAR[p], dark ? sw[2] : sw[1]); else st.removeProperty(PVAR[p]); });
 }
 // Avatar circle: the person's photo if they added one, else their initials, on their color.
+// Each color belongs to one person. Default colors count as taken too.
+function colorIdx(p){ const c = (S.settings.colors||{})[p]; if(c!==undefined) return c; const d = {K:0,Y:1,L:2}[p]; if(d!==undefined) return d; const i = Object.keys(PVAR).indexOf(p); return (i+3)%PALETTE.length; }
+const colorTaken = (p,i) => Object.keys(NAMES).some(q=>q!==p && colorIdx(q)===i);
 function avatar(p,all,big){ const ph = (S.photos||{})[p], ppl = all || Object.keys(NAMES);
   return `<span class="av${big?' big':''}" style="--pc:${PC[p]}" title="${NAMES[p]}" aria-label="${NAMES[p]}">${ph?`<img src="${ph}" alt="">`:initials(p,ppl)}</span>`; }
 // My profile: your own photo and color, plus the kids' if you're a parent. Other adults' profiles aren't shown.
@@ -1641,19 +1656,26 @@ function confirmRm(x){ if(rmArm===x.id){ rmArm = null; return true; } rmArm = x.
 function vFamily(){
   if(KIDS.includes(S.view.me)) return `<h2 style="font-size:22px">Family settings</h2><div class="card muted">Parents manage family settings.</div>`;
   const kidCard = k => { const b = kidBand(k), a = ageYears(k.dob);
-    return `<div class="card" style="margin-top:8px">${profBlock(k.id)}
+    const open = !!(ui.kidOpen||{})[k.id];
+    const head = `<button class="slothead" style="border-top:0;padding:2px 0" data-act="kidopen" data-p="${k.id}" aria-expanded="${open}">${avatar(k.id)}<span class="grow1"><b>${esc(k.name)}</b><br><span class="small muted">${a===null?b[1]:'Age '+a} · dinner ${kidKcal(k.id)} cal</span></span><span class="chev" style="${open?'transform:rotate(90deg)':''}">›</span></button>`;
+    if(!open) return `<div class="card" style="margin-top:8px">${head}</div>`;
+    return `<div class="card" style="margin-top:8px">${head}<div style="margin-top:12px">${profBlock(k.id)}</div>
       <div class="field" style="margin-top:12px"><label for="kd-${k.id}">Birthday</label><input class="textin" type="date" id="kd-${k.id}" data-act="kiddob" data-p="${k.id}" value="${k.dob||''}"><span class="note">${a===null?'Add a birthday so portions grow with them. Until then: '+b[1]+'.':'Age '+a+' · '+b[1]+' portions. Moves up automatically on their birthday.'}</span></div>
       ${k.dob?'':`<div class="field"><span class="lbl">Age</span><div class="chips">${AGE_BANDS.map(x=>`<button class="chip ${b[0]===x[0]?'on':''}" data-act="kidband" data-p="${k.id}" data-v="${x[0]}">${x[1]}</button>`).join('')}</div></div>`}
       <div class="field"><div class="row between"><span class="lbl">Dinner portion</span><div class="stepper"><button data-act="kidadj" data-p="${k.id}" data-d="-25" aria-label="Less">−</button><span>${kidKcal(k.id)} cal</span><button data-act="kidadj" data-p="${k.id}" data-d="25" aria-label="More">+</button></div></div>
         <span class="note">Portions are recommended by age (${b[1]}: about ${b[2]} cal, at least ${wt(b[3])} cooked meat). Use − and + to fit your child's appetite${k.adj?` · you've set ${k.adj>0?'+':''}${k.adj} cal`:''}.</span></div>
       <button class="linkbtn" style="color:var(--bad)" data-act="kidrm" data-p="${k.id}">Remove ${esc(k.name)}</button></div>`; };
-  return `<h2 style="font-size:22px">Family settings</h2>` + vMacros().replace('<h2 style="font-size:22px">Daily targets</h2>','<h2 style="font-size:17px;margin-top:10px">Adults · daily targets</h2>').replace(`<p class="note">Kids' dinner portions are in Family settings.</p>`,'') + `<h2 style="font-size:17px;margin-top:18px">Kids</h2>${kidsList().map(kidCard).join('')}
+  const sh = SHARED(), so = !!ui.famShared;
+  const shared = `<div class="card" style="margin-top:8px"><button class="slothead" style="border-top:0;padding:2px 0" data-act="famshared" aria-expanded="${so}"><span class="grow1"><b>Shared meals</b><br><span class="small muted">Breakfast ${sh.b?'shared':'separate'} · Lunch ${sh.l?'shared':'separate'} · Dinner with the family</span></span><span class="chev" style="${so?'transform:rotate(90deg)':''}">›</span></button>
+    ${so ? `${[['b','Breakfast'],['l','Lunch']].map(([k,l])=>`<div class="field" style="margin-top:10px"><span class="lbl">${l}</span><div class="seg"><button class="${sh[k]?'on':''}" data-act="shared" data-k="${k}" data-v="1">Shared</button><button class="${sh[k]?'':'on'}" data-act="shared" data-k="${k}" data-v="0">Each their own</button></div></div>`).join('')}
+      <div class="field"><span class="lbl">Dinner</span><span class="note">Always the family meal. Kids eat dinner only.</span></div><span class="note">Claude plans new weeks to match. Weeks already planned stay as they are.</span>` : ''}</div>`;
+  return `<h2 style="font-size:22px">Family settings</h2>` + shared + vMacros().replace('<h2 style="font-size:22px">Daily targets</h2>','<h2 style="font-size:17px;margin-top:10px">Adults · daily targets</h2>').replace(`<p class="note">Kids' dinner portions are in Family settings.</p>`,'') + `<h2 style="font-size:17px;margin-top:18px">Kids</h2>${kidsList().map(kidCard).join('')}
     ${kidsList().length>=MAX_KIDS ? `<p class="note">Households can have up to 2 adults and ${MAX_KIDS} kids.</p>` : `<div class="card" style="margin-top:8px"><form class="addform" data-form="kid" style="margin:0"><input id="kid-name" placeholder="Child's name" aria-label="Child's name"><button class="btn primary" type="submit">+ Add child</button></form><span class="note">Kids get the family dinner, portioned for their age. Up to 2 adults and ${MAX_KIDS} kids.</span></div>`}`;
 }
 function profBlock(p){ const c = S.settings.colors || {}; return `<div class="row" style="gap:14px;align-items:center">${avatar(p,null,true)}<div style="flex:1"><h3 style="font-size:18px">${NAMES[p]}</h3>
       <div class="row" style="gap:8px;margin-top:6px"><label class="btn" for="ph-${p}" style="padding:6px 12px;cursor:pointer">${(S.photos||{})[p]?'Change photo':'Add photo'}</label><input type="file" id="ph-${p}" accept="image/*" data-act="photo" data-p="${p}" hidden>${(S.photos||{})[p]?`<button class="linkbtn" data-act="rmphoto" data-p="${p}">Remove</button>`:''}</div></div></div>
     ${p===S.view.me?`<div class="field" style="margin-top:12px"><span class="lbl">Weigh in</span><div class="seg">${[['g','Grams'],['oz','Ounces']].map(([v,l])=>`<button class="${WU()===v?'on':''}" data-act="wunit" data-v="${v}">${l}</button>`).join('')}</div><span class="note">Servings, cooked weights and pantry sizes show in this unit. Rice stays in cups.</span></div>`:''}
-    <div class="field" style="margin-top:12px"><span class="lbl">Color</span><span class="chips" style="gap:8px">${PALETTE.map((sw,i)=>`<button class="swatch ${c[p]===i?'on':''}" style="--sw:${isDark()?sw[2]:sw[1]}" data-act="pcolor" data-p="${p}" data-i="${i}" aria-label="${sw[0]}"></button>`).join('')}</span></div>`; }
+    <div class="field" style="margin-top:12px"><span class="lbl">Color</span><span class="chips" style="gap:8px">${PALETTE.map((sw,i)=>{ const taken = colorTaken(p,i); return `<button class="swatch ${colorIdx(p)===i?'on':''} ${taken?'taken':''}" style="--sw:${isDark()?sw[2]:sw[1]}" data-act="pcolor" data-p="${p}" data-i="${i}" ${taken?'disabled':''} aria-label="${sw[0]}${taken?' (taken)':''}"></button>`; }).join('')}</span></div>`; }
 function vProfileBody(me){ const block = profBlock;
   return `<h2 style="font-size:22px">Personal settings</h2><div class="card">${block(me)}</div>
     <h2 style="font-size:17px;margin-top:18px">This phone</h2><div class="card">
