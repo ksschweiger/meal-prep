@@ -311,7 +311,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-21dev12';
+const APP_VERSION = '2026-11-21dev13';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -1635,7 +1635,7 @@ function vFamily(){
       <div class="field" style="margin-top:12px"><label for="kd-${k.id}">Birthday</label><input class="textin" type="date" id="kd-${k.id}" data-act="kiddob" data-p="${k.id}" value="${k.dob||''}"><span class="note">${a===null?'Add a birthday so portions grow with them. Until then: '+b[1]+'.':'Age '+a+' · '+b[1]+' portions. Moves up automatically on their birthday.'}</span></div>
       ${k.dob?'':`<div class="field"><span class="lbl">Age</span><div class="chips">${AGE_BANDS.map(x=>`<button class="chip ${b[0]===x[0]?'on':''}" data-act="kidband" data-p="${k.id}" data-v="${x[0]}">${x[1]}</button>`).join('')}</div></div>`}
       <div class="field"><div class="row between"><span class="lbl">Dinner portion</span><div class="stepper"><button data-act="kidadj" data-p="${k.id}" data-d="-25" aria-label="Less">−</button><span>${kidKcal(k.id)} cal</span><button data-act="kidadj" data-p="${k.id}" data-d="25" aria-label="More">+</button></div></div>
-        <span class="note">Dinner only. ${b[1]}: about ${b[2]} cal and at least ${wt(b[3])} of cooked meat${k.adj?` (you've set ${k.adj>0?'+':''}${k.adj} cal)`:''}. Same meal as the family, scaled down.</span></div>
+        <span class="note">Portions are recommended by age (${b[1]}: about ${b[2]} cal, at least ${wt(b[3])} cooked meat). Use − and + to fit your child's appetite${k.adj?` · you've set ${k.adj>0?'+':''}${k.adj} cal`:''}.</span></div>
       <button class="linkbtn" style="color:var(--bad)" data-act="kidrm" data-p="${k.id}">Remove ${esc(k.name)}</button></div>`; };
   return `<h2 style="font-size:22px">Family settings</h2>` + vMacros().replace('<h2 style="font-size:22px">Daily targets</h2>','<h2 style="font-size:17px;margin-top:10px">Adults · daily targets</h2>').replace(`<p class="note">Kids' dinner portions are in Family settings.</p>`,'') + `<h2 style="font-size:17px;margin-top:18px">Kids</h2>${kidsList().map(kidCard).join('')}
     <div class="card" style="margin-top:8px"><form class="addform" data-form="kid" style="margin:0"><input id="kid-name" placeholder="Child's name" aria-label="Child's name"><button class="btn primary" type="submit">+ Add child</button></form><span class="note">Kids get the family dinner, portioned for their age.</span></div>`;
