@@ -312,7 +312,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-21dev19';
+const APP_VERSION = '2026-11-21dev20';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -389,7 +389,8 @@ function onCred(r){
   TOKEN = r.credential;
   let exp = Date.now()+3500e3; try{ exp = JSON.parse(atob(TOKEN.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))).exp*1000; }catch(e){}
   lsSet('mp-token', JSON.stringify({v:TOKEN, exp}));
-  boot();
+  // Trade the 1-hour Google pass for a 14-day app session. If the sheet's code isn't updated yet, keep the Google pass.
+  api('session').then(j=>{ if(j.session){ TOKEN = j.session; lsSet('mp-token', JSON.stringify({v:j.session, exp:j.exp})); } }).catch(()=>{}).then(boot);
 }
 function signOut(expired){
   lsSet('mp-token', null); TOKEN = null;

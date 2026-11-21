@@ -11,7 +11,7 @@ function doPost(e) {
   try {
     const body = JSON.parse(e.postData.contents || '{}');
     const user = verify_(body.token);
-    out = route_(body, user);
+    out = body.action === 'session' ? newSession_(user) : route_(body, user);
   } catch (err) {
     out = { ok: false, error: String(err && err.message || err) };
   }
@@ -31,8 +31,36 @@ function setting_(label) {
   return r ? r[1] : '';
 }
 
+/* ---------- 14-day sessions ----------
+ * After one Google sign-in, the app gets its own session key (starts with "S.") that lasts 14 days,
+ * so nobody has to sign in again every day. Keys live in Script Properties.
+ */
+const SESSION_DAYS = 14;
+function newSession_(user) {
+  const key = 'S.' + Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '');
+  const exp = Date.now() + SESSION_DAYS * 864e5;
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty('sess:' + key, JSON.stringify({ email: user.email, exp: exp }));
+  // Tidy up expired sessions.
+  const all = props.getProperties();
+  Object.keys(all).forEach(k => { if (k.indexOf('sess:') === 0) { try { if (JSON.parse(all[k]).exp < Date.now()) props.deleteProperty(k); } catch (e) { props.deleteProperty(k); } } });
+  return { ok: true, session: key, exp: exp };
+}
+function userFor_(email) {
+  const users = SHEET.getSheetByName('Users').getDataRange().getValues().slice(1);
+  const u = users.find(r => String(r[0]).trim().toLowerCase() === email);
+  if (!u) throw new Error(email + ' is not on the Users list.');
+  return { email: email, name: u[1], person: u[2] };
+}
+
 function verify_(token) {
   if (!token) throw new Error('Not signed in.');
+  if (token.indexOf('S.') === 0) {
+    const raw = PropertiesService.getScriptProperties().getProperty('sess:' + token);
+    const s = raw ? JSON.parse(raw) : null;
+    if (!s || s.exp < Date.now()) throw new Error('Sign-in expired. Please sign in again.');
+    return userFor_(s.email);
+  }
   const cache = CacheService.getScriptCache();
   const hit = cache.get('t:' + token.slice(-40));
   let email;
