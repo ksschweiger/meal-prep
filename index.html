@@ -150,6 +150,12 @@ main{padding-block:14px 110px}
 .swatch{width:22px;height:22px;border-radius:50%;background:var(--sw);border:2px solid var(--surface);box-shadow:0 0 0 1px var(--line);padding:0;cursor:pointer}.mgrid{table-layout:fixed;width:100%}.mgrid td,.mgrid th{text-align:center;padding:8px 3px 4px;vertical-align:top}.mgrid td:first-child,.mgrid th:first-child{text-align:left;font-weight:600;width:86px;padding-top:14px}
 .notebtn{display:block;margin:4px auto 0;background:none;border:0;color:var(--accent);font-size:11.5px;font-weight:700;padding:2px;cursor:pointer}.notebtn.on{color:var(--good)}
 .mealsel{width:100%;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:7px 6px;font:inherit;font-size:14px;text-align:center;text-align-last:center}
+.instsec{margin-top:8px;padding:10px 12px}.instsec summary{font-size:16px}
+.inststeps{list-style:none;margin:10px 0 2px;padding:0;display:flex;flex-direction:column;gap:10px;font-size:15px;line-height:1.5}
+.inststeps li{display:flex;gap:10px;align-items:flex-start}
+.stepn{flex:none;width:22px;height:22px;border-radius:50%;background:var(--accent);color:var(--accent-ink);font:700 12px/22px var(--body);text-align:center;margin-top:1px}
+.tapic{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:7px;background:var(--sunk);border:1px solid var(--line);color:#2F7BF6;vertical-align:-7px;margin:0 2px}
+.tapic svg{width:17px;height:17px}
 .swatch.taken{opacity:.25;cursor:not-allowed}
 .swatch.on{box-shadow:0 0 0 2px var(--ink)}
 .av{overflow:hidden;display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:30px;padding:0 6px;border-radius:999px;background:var(--pc);color:var(--surface);font:700 12.5px var(--body)}
@@ -319,7 +325,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-21j';
+const APP_VERSION = '2026-11-21k';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -1494,6 +1500,7 @@ document.addEventListener('click', e=>{
   else if(a==='kidrm'){ const x = kidOf(t.dataset.p); if(!x || !confirmRm(x)) return; S.settings.kids = kidsList().filter(y=>y.id!==x.id); changed('Family'); render(); toast(x.name+' removed. Dinners rescale for everyone else.'); }
   else if(a==='tol'){ S.settings.tol = Object.assign({}, S.settings.tol, {[t.dataset.p]:t.dataset.v}); changed('Macros'); render(); }
   else if(a==='seenNew'){ S.seen = Object.assign({}, S.seen, {[seenKey()]:RELEASES[0].v}); save(); closeSheet(); }
+  else if(a==='instopen'){ e.preventDefault(); ui.instOpen = ui.instOpen===t.dataset.k ? null : t.dataset.k; showInstall(); }
   else if(a==='install'){ ui.menu = false; render(); showInstall(); }
   else if(a==='whatsnew'){ ui.menu = false; render(); showWhatsNew(true); }
   else if(a==='famshared'){ ui.famShared = !ui.famShared; render(); }
@@ -1784,17 +1791,29 @@ let installEvt = null; window.addEventListener('beforeinstallprompt', e=>{ e.pre
 const isStandalone = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
 function showInstall(){
   if(installEvt){ installEvt.prompt(); installEvt.userChoice.finally(()=>{ installEvt = null; }); return; }
-  const ua = navigator.userAgent||'', ios = /iPhone|iPad|iPod/.test(ua), chromeIOS = /CriOS/.test(ua);
-  const steps = ios ? [
-      chromeIOS ? 'Tap the Share icon next to the address bar (square with an arrow).' : 'Tap the Share button (square with an arrow) at the bottom of the screen or next to the address bar.',
-      'Scroll down and tap Add to Home Screen. Not there? Tap Edit Actions at the bottom and add it.',
-      'Tap Add. A stove icon appears on your Home Screen.',
-      'Open the app from that icon and sign in once.']
-    : ['Open your browser menu (⋮).', 'Tap Install app or Add to Home screen.', 'Open it from the new icon and sign in once.'];
+  // Little pictures of what to tap, drawn to look like iPhone's own buttons.
+  const ic = (svg, label) => `<span class="tapic" aria-label="${label}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${svg}</svg></span>`;
+  const SHARE = ic('<path d="M12 3v12M8 7l4-4 4 4"/><path d="M6 11H5v10h14V11h-1"/>','Share'),
+        DOTS = ic('<circle cx="6" cy="12" r="1.3" fill="currentColor"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/><circle cx="18" cy="12" r="1.3" fill="currentColor"/>','More'),
+        MORE = ic('<path d="M7 14l5-5 5 5"/>','View More'),
+        ADD = ic('<rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 8v8M8 12h8"/>','Add to Home Screen');
+  const step = (n, html) => `<li><span class="stepn">${n}</span><span>${html}</span></li>`;
+  const sec = (id, title, steps) => `<details class="card more instsec" ${ui.instOpen===id?'open':''}><summary data-act="instopen" data-k="${id}"><b>${title}</b></summary><ol class="inststeps">${steps.map((x,i)=>step(i+1,x)).join('')}</ol></details>`;
+  const ua = navigator.userAgent||'', ios = /iPhone|iPad|iPod/.test(ua);
+  const body = ios ? sec('safari','Safari', [
+        `Tap ${SHARE} <b>Share</b>. On newer iPhones, tap ${DOTS} first, then ${SHARE} <b>Share</b>.`,
+        `If you don't see it right away, tap ${MORE} <b>View More</b>.`,
+        `Tap ${ADD} <b>Add to Home Screen</b>, then <b>Add</b>.`,
+        `Open Meal Prep from the new icon and sign in once.`])
+      + sec('chrome','Chrome', [
+        `Tap ${SHARE} <b>Share</b> next to the address bar.`,
+        `Tap ${MORE} <b>View More</b>.`,
+        `Tap ${ADD} <b>Add to Home Screen</b>, then <b>Add</b>.`,
+        `Open Meal Prep from the new icon and sign in once.`])
+    : `<ol class="inststeps">${['Open your browser menu (⋮).','Tap <b>Install app</b> or <b>Add to Home screen</b>.','Open it from the new icon and sign in once.'].map((x,i)=>step(i+1,x)).join('')}</ol>`;
   openSheet(`<div class="row between"><h2>Add to Home Screen</h2><button class="iconbtn" data-act="closeSheet" aria-label="Close">${I.x}</button></div>
-    <ol style="margin:8px 0 14px;padding-left:22px;display:flex;flex-direction:column;gap:8px;font-size:15px">${steps.map(x=>`<li>${esc(x)}</li>`).join('')}</ol>
-    <p class="note">iPhone doesn't let websites add themselves, so this takes a few taps in the Share menu. It works from Safari or Chrome.</p>
-    <button class="btn primary block" data-act="closeSheet">Got it</button>`);
+    <p class="note" style="margin:4px 0 10px">Pick the browser you're using.</p>${body}
+    <button class="btn primary block" style="margin-top:10px" data-act="closeSheet">Got it</button>`);
 }
 function applyTheme(){ const se = lsGet('mp-season')==='off' ? '' : seasonOf(ds(new Date())); if(se) document.documentElement.dataset.season = se; else delete document.documentElement.dataset.season;
   const v = lsGet('mp-theme'); if(v) document.documentElement.dataset.theme = v; else delete document.documentElement.dataset.theme;
