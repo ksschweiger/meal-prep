@@ -311,7 +311,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-21dev15';
+const APP_VERSION = '2026-11-21dev16';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -362,8 +362,8 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>'
 // ---------- Live data ----------
 const API = 'https://script.google.com/macros/s/AKfycbxA3OApqNe6cCAINSDweKl0207wSilqda7bg3G5AdnNQ6vK7edcavIumCy-4MaAJVI/exec';
 const CLIENT_ID = '483809178986-kva2i39rl5iv08qkkfkdojla0ve6p5gq.apps.googleusercontent.com';
-const SYNC_KEYS = ['punits','photos','settings','macros','profile','plan','ratings','cooked','checks','locked','lockAdds','skipped','shopMoves','haveIt','styles','drinkOn','ptr','priceJobs','prices','shopLog'];
-const DEFAULTS = {punits:{}, photos:{}, priceJobs:{}, prices:{}, shopLog:[], settings:{prep:[1,3],shopDay:1,weekend:'light',maxRun:3,lead:3,store:'Meijer pickup',budget:750,landen:25}, macros:{K:{kcal:2600,p:35,c:40,f:25},Y:{kcal:1700,p:35,c:40,f:25}}, profile:{}, plan:null, ratings:{}, cooked:{}, checks:{}, locked:{}, lockAdds:{}, skipped:{}, shopMoves:{}, haveIt:{}, styles:[], drinkOn:{}, ptr:{}};
+const SYNC_KEYS = ['seen','punits','photos','settings','macros','profile','plan','ratings','cooked','checks','locked','lockAdds','skipped','shopMoves','haveIt','styles','drinkOn','ptr','priceJobs','prices','shopLog'];
+const DEFAULTS = {seen:{}, punits:{}, photos:{}, priceJobs:{}, prices:{}, shopLog:[], settings:{prep:[1,3],shopDay:1,weekend:'light',maxRun:3,lead:3,store:'Meijer pickup',budget:750,landen:25}, macros:{K:{kcal:2600,p:35,c:40,f:25},Y:{kcal:1700,p:35,c:40,f:25}}, profile:{}, plan:null, ratings:{}, cooked:{}, checks:{}, locked:{}, lockAdds:{}, skipped:{}, shopMoves:{}, haveIt:{}, styles:[], drinkOn:{}, ptr:{}};
 const EMPTY_PLAN = () => ({cycles:[], days:{}, start:TODAY, end:TODAY});
 let S = null, USER = null, TOKEN = null, PANTRY = [];
 const SNAP = {}, PSNAP = {}; let FSNAP = '';
@@ -423,6 +423,7 @@ function boot(){
     if(!S.plan.days[ui.sel]) ui.sel = S.plan.days[TODAY] ? TODAY : (Object.keys(S.plan.days).sort().find(d=>d>=TODAY) || TODAY);
     setSync('');
     render();
+    showWhatsNew();
   }).catch(e=>{ if(TOKEN) document.getElementById('view').innerHTML = `<div class="signin"><p>${esc(e.message)}</p><button class="btn" data-act="retry">Try again</button></div>`; setSync(''); });
 }
 
@@ -758,7 +759,7 @@ function render(){
   syncKids();
   applyColors();
   const me = document.getElementById('meav'); if(me) me.innerHTML = avatar(S.view.me);
-  const pop = document.getElementById('mepop'); if(pop){ pop.hidden = !ui.menu; pop.innerHTML = ui.menu ? `<div class="mescrim" data-act="memenu"></div><div class="mepop" role="menu">${[['profile','Personal settings','Photo, color, units, this phone'],['settings','Meal prep settings','Shopping, prep days, budget, store'],['family','Family settings','Macros, kids and their portions']].map(([t,l,sub])=>`<button role="menuitem" class="${ui.tab===t?'on':''}" data-act="tab" data-tab="${t}"><b>${l}</b><span class="small muted">${sub}</span></button>`).join('')}</div>` : ''; }
+  const pop = document.getElementById('mepop'); if(pop){ pop.hidden = !ui.menu; pop.innerHTML = ui.menu ? `<div class="mescrim" data-act="memenu"></div><div class="mepop" role="menu">${[['profile','Personal settings','Photo, color, units, this phone'],['settings','Meal prep settings','Shopping, prep days, budget, store'],['family','Family settings','Macros, kids and their portions']].map(([t,l,sub])=>`<button role="menuitem" class="${ui.tab===t?'on':''}" data-act="tab" data-tab="${t}"><b>${l}</b><span class="small muted">${sub}</span></button>`).join('')}<button role="menuitem" data-act="whatsnew"><b>What's new</b><span class="small muted">Latest changes to the app</span></button></div>` : ''; }
   document.getElementById('tabs').innerHTML = TABS.map(t=>`<button data-act="tab" data-tab="${t[0]}" class="${ui.tab===t[0] || (t[0]==='calendar' && CAL_TABS.includes(ui.tab))?'on':''}" aria-label="${t[1]}">${t[2]}<span>${t[1]}</span></button>`).join('');
   const v = document.getElementById('view');
   v.style.touchAction = ['week','day','day2'].includes(ui.tab) ? 'pan-y' : '';
@@ -1453,6 +1454,8 @@ document.addEventListener('click', e=>{
   else if(a==='kidadj'){ const k = kidsList().map(x=>Object.assign({},x)); const x = k.find(y=>y.id===t.dataset.p); if(!x) return; x.adj = Math.max(-200, Math.min(200, (x.adj||0) + +t.dataset.d)); S.settings.kids = k; changed('Family'); render(); }
   else if(a==='kidrm'){ const x = kidOf(t.dataset.p); if(!x || !confirmRm(x)) return; S.settings.kids = kidsList().filter(y=>y.id!==x.id); changed('Family'); render(); toast(x.name+' removed. Dinners rescale for everyone else.'); }
   else if(a==='tol'){ S.settings.tol = Object.assign({}, S.settings.tol, {[t.dataset.p]:t.dataset.v}); changed('Macros'); render(); }
+  else if(a==='seenNew'){ S.seen = Object.assign({}, S.seen, {[seenKey()]:RELEASES[0].v}); save(); closeSheet(); }
+  else if(a==='whatsnew'){ ui.menu = false; render(); showWhatsNew(true); }
   else if(a==='pcolor'){ const p = t.dataset.p; if(p!==S.view.me && !KIDS.includes(p)) return; S.settings.colors = Object.assign({}, S.settings.colors, {[p]:+t.dataset.i}); changed('Settings'); render(); }
   else if(a==='theme'){ lsSet('mp-theme', t.dataset.v==='auto'?null:t.dataset.v); applyTheme(); render(); }
   else if(a==='weekend'){ S.settings.weekend = t.dataset.v; changed('Settings'); render(); }
@@ -1665,6 +1668,26 @@ function vProfileBody(me){ const block = profBlock;
 function squarePhoto(file){ return new Promise((ok,no)=>{ const r = new FileReader(); r.onerror = no; r.onload = ()=>{ const im = new Image(); im.onerror = no; im.onload = ()=>{
   const n = 160, cv = document.createElement('canvas'); cv.width = cv.height = n; const m = Math.min(im.width, im.height);
   cv.getContext('2d').drawImage(im, (im.width-m)/2, (im.height-m)/2, m, m, 0, 0, n, n); ok(cv.toDataURL('image/jpeg', .8)); }; im.src = r.result; }; r.readAsDataURL(file); }); }
+// ---------- What's new ----------
+// Newest first. Each person sees a release once, the next time they open the app; Dev and the live app track it separately.
+const RELEASES = [
+  {v:'2026-11-21', title:"What's new", items:[
+    'Tap your circle (top right) for Personal, Meal prep and Family settings. Settings and Macros moved there.',
+    'Add a photo and pick your color. Parents set the kids\' too.',
+    'Choose grams or ounces in Personal settings.',
+    'Serving size shows everyone across the top, so each item reads straight across.',
+    'Kids: add children and set a birthday. Dinner portions follow their age, and you can adjust them.',
+    'Pick how close to your macros you want to land: Relaxed, Balanced or Strict.',
+    'Pantry: add items with your own unit and how many you have, and tap any item to edit it.']}
+];
+const seenKey = () => S.view.me + (location.pathname.includes('/dev/') ? '@dev' : '');
+function showWhatsNew(force){
+  const r = RELEASES[0]; if(!r || !S) return;
+  if(!force && (S.seen||{})[seenKey()] >= r.v) return;
+  openSheet(`<div class="row between"><h2>${esc(r.title)}</h2><button class="iconbtn" data-act="seenNew" aria-label="Close">${I.x}</button></div>
+    <ul style="margin:8px 0 14px;padding-left:20px;display:flex;flex-direction:column;gap:8px;font-size:15px">${r.items.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
+    <button class="btn primary block" data-act="seenNew">Got it</button>`);
+}
 function applyTheme(){ const se = lsGet('mp-season')==='off' ? '' : seasonOf(ds(new Date())); if(se) document.documentElement.dataset.season = se; else delete document.documentElement.dataset.season;
   const v = lsGet('mp-theme'); if(v) document.documentElement.dataset.theme = v; else delete document.documentElement.dataset.theme;
   const dark = v==='dark' || (!v && matchMedia('(prefers-color-scheme: dark)').matches);

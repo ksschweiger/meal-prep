@@ -8,4 +8,4 @@ Both use the same Google sign-in and the same Meal Prep Database sheet, so chang
 0. Before each Dev session, copy the Meal Prep Database sheet as "Meal Prep Database — Backup YYYY-MM-DD" in the same Drive folder.
 1. Make every change in `dev/index.html` first.
 2. Test it on the Dev link.
-3. When it's approved, copy the change into `index.html`, bump `APP_VERSION`, and push.
+3. When it's approved, add a new entry to the top of `RELEASES` (date + 2–7 short bullets), copy `dev/index.html` into `index.html` (minus the DEV banner and title), bump `APP_VERSION`, and push. Each person sees the notice once on their next open; Dev and live track it separately.
