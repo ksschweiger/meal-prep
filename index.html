@@ -147,9 +147,9 @@ main{padding-block:14px 110px}
 .mepop button.on,.mepop button:active{background:var(--sunk)}
 .meav{background:none;border:0;padding:0;margin-left:8px;cursor:pointer;display:flex}
 .pitem{background:none;border:0;padding:0;font:inherit;color:inherit;text-align:left;cursor:pointer}
-.swatch{width:22px;height:22px;border-radius:50%;background:var(--sw);border:2px solid var(--surface);box-shadow:0 0 0 1px var(--line);padding:0;cursor:pointer}.mgrid td,.mgrid th{text-align:center;padding:6px 3px}.mgrid td:first-child{text-align:left;font-weight:600;width:auto}
+.swatch{width:22px;height:22px;border-radius:50%;background:var(--sw);border:2px solid var(--surface);box-shadow:0 0 0 1px var(--line);padding:0;cursor:pointer}.mgrid{table-layout:fixed;width:100%}.mgrid td,.mgrid th{text-align:center;padding:8px 3px 4px;vertical-align:top}.mgrid td:first-child,.mgrid th:first-child{text-align:left;font-weight:600;width:86px;padding-top:14px}
 .notebtn{display:block;margin:4px auto 0;background:none;border:0;color:var(--accent);font-size:11.5px;font-weight:700;padding:2px;cursor:pointer}.notebtn.on{color:var(--good)}
-.mealsel{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:5px 4px;font:inherit;font-size:13px;max-width:84px}
+.mealsel{width:100%;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:7px 6px;font:inherit;font-size:14px;text-align:center;text-align-last:center}
 .swatch.taken{opacity:.25;cursor:not-allowed}
 .swatch.on{box-shadow:0 0 0 2px var(--ink)}
 .av{overflow:hidden;display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:30px;padding:0 6px;border-radius:999px;background:var(--pc);color:var(--surface);font:700 12.5px var(--body)}
@@ -319,7 +319,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-21f';
+const APP_VERSION = '2026-11-21g';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -1712,18 +1712,18 @@ function vFamily(){
       <button class="linkbtn" style="color:var(--bad)" data-act="kidrm" data-p="${k.id}">Remove ${esc(k.name)}</button></div>`; };
   const g = mealGrid(), ppl = ['K','Y'].concat(KIDS), so = !!ui.famShared;
   const ML = {b:'Breakfast', l:'Lunch', d:'Dinner', s:'Snack'};
-  const OPTS = m => m==='s' ? [['own','Own'],['na','None']] : [['1',ML[m]+' 1'],['2',ML[m]+' 2'],['na','None']];
-  const cell = (p,m) => { if(isKid(p) && m==='s') return '<td class="muted">—</td>';
+  const OPTS = m => m==='s' ? [['own','Own'],['na','None']] : [['1','1'],['2','2'],['na','None']];
+  const cell = (p,m) => { if(isKid(p) && m==='s') return '<td class="muted" style="padding-top:12px">—</td>';
     const n = (S.settings.mealNotes||{})[p+'|'+m], has = n && ((n.tags||[]).length || n.note);
     return `<td><select class="mealsel" data-act="mealset" data-p="${p}" data-m="${m}" aria-label="${NAMES[p]} ${ML[m]}">${OPTS(m).map(([v,l])=>`<option value="${v}" ${String(g[p][m])===v?'selected':''}>${l}</option>`).join('')}</select>
-      ${g[p][m]!=='na' ? `<button class="notebtn ${has?'on':''}" data-act="mealnote" data-p="${p}" data-m="${m}" aria-label="Notes for ${NAMES[p]} ${ML[m]}">${has?'✓ Notes':'+ Notes'}</button>` : ''}</td>`; };
+      ${g[p][m]!=='na' ? `<button class="notebtn ${has?'on':''}" data-act="mealnote" data-p="${p}" data-m="${m}" aria-label="Notes for ${NAMES[p]} ${ML[m]}">${has?'✓ Notes':'+ Notes'}</button>` : `<span class="notebtn" style="visibility:hidden">+ Notes</span>`}</td>`; };
   const cook = MAIN.map(m=>{ const n = new Set(ppl.map(p=>g[p][m]).filter(v=>v!=='na')).size; return n ? `${ML[m]}: ${n} recipe${n>1?'s':''}` : ''; }).filter(Boolean).join(' · ');
   const per = p => isKid(p) ? `${kidKcal(p)} cal each` : `${Math.round((S.macros[p].kcal - 0)/mealsOf(p)).toLocaleString()} cal each`;
   const shared = `<div class="card" style="margin-top:8px">${famHead('famshared', '', so, `<div class="pname" style="font-size:18px">Meals</div>`, 'Who eats what')}
     ${so ? `<div class="tblwrap"><table class="stbl mgrid"><thead><tr><th></th>${ppl.map(p=>`<th>${avatar(p,ppl)}</th>`).join('')}</tr></thead><tbody>
       ${[['b','Breakfast'],['l','Lunch'],['d','Dinner'],['s','Snack']].map(([m,l])=>`<tr><td>${l}</td>${ppl.map(p=>cell(p,m)).join('')}</tr>`).join('')}
       <tr><td class="small muted">Per meal</td>${ppl.map(p=>`<td class="small muted">${mealsOf(p)} meal${mealsOf(p)>1?'s':''}<br>~${isKid(p)?kidKcal(p):Math.round(S.macros[p].kcal/mealsOf(p)).toLocaleString()} cal</td>`).join('')}</tr></tbody></table></div>
-      <p class="small" style="margin:8px 0 4px"><b>To cook:</b> ${cook}</p><span class="note">Same number = same food, cooked once and split by weight. A number only one person picks is their own meal. None = not eating it. Add notes for details like eaten at work or no microwave; Claude plans around them. Adults' daily calories are split evenly across the breakfast, lunch and dinner they eat (the latte and snacks come off the top). Kids get a third of their daily calories per meal. Claude plans new weeks to match.</span>` : ''}</div>`;
+      <p class="small" style="margin:8px 0 4px"><b>To cook:</b> ${cook}</p><span class="note">Numbers are meals: same number = same food, cooked once and split by weight. A number only one person picks is their own meal. None = not eating it. Add notes for details like eaten at work or no microwave; Claude plans around them. Adults' daily calories are split evenly across the breakfast, lunch and dinner they eat (the latte and snacks come off the top). Kids get a third of their daily calories per meal. Claude plans new weeks to match.</span>` : ''}</div>`;
   return `<h2 style="font-size:22px">Family settings</h2>` + shared + vMacros().replace('<h2 style="font-size:22px">Daily targets</h2>','<h2 style="font-size:17px;margin-top:10px">Adults · daily targets</h2>').replace(`<p class="note">Kids' dinner portions are in Family settings.</p>`,'') + `<h2 style="font-size:17px;margin-top:18px">Kids</h2>${kidsList().map(kidCard).join('')}
     ${kidsList().length>=MAX_KIDS ? `<p class="note">Households can have up to 2 adults and ${MAX_KIDS} kids.</p>` : `<div class="card" style="margin-top:8px"><form class="addform" data-form="kid" style="margin:0"><input id="kid-name" placeholder="Child's name" aria-label="Child's name"><button class="btn primary" type="submit">+ Add child</button></form><span class="note">Kids get the family dinner, portioned for their age. Up to 2 adults and ${MAX_KIDS} kids.</span></div>`}`;
 }
