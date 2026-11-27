@@ -329,7 +329,7 @@ const I = {
 };
 
 // Foods and recipes load from the Google Sheet (Foods and Recipes tabs).
-const APP_VERSION = '2026-11-21p';
+const APP_VERSION = '2026-11-27a';
 let FOODS = {}, MEALS = {};
 // Freezer tab keys that differ from Foods keys.
 const FZ_FOOD = {'chicken-breast':'chicken','ground-beef':'beef','ground-venison':'venison','beef-stew-meat':'stewmeat','italian-sausage':'isausage','chicken-whole':'halfchicken','pork-country-ribs':'porkribs'};
@@ -701,8 +701,9 @@ function needsRange(start,end,shopWeek,noCarry){
         // Shared lunches and dinners are bought for the day they're cooked; everything else for the day it's eaten.
         const cd = (k==='l'||k==='d') ? getRun(d,k).find(x=>!isFlex(x,k)) || d : d;
         if(cd<start || cd>last) return;
-        if(cd===start && MORNING.includes(k)) return;
-        if(cd===last && !MORNING.includes(k)) return;
+        // Everything cooked or eaten from the shopping day on goes on that day's trip, so nothing lands on a trip
+        // that already happened (or got skipped). Food for the next shopping day goes on the next trip.
+        if(cd===last) return;
       } else {
         if(noCarry && isCarry(d,k) && getRun(d,k)[0] < start) return; // leftovers of a batch made before this range
         if(noCarry && d>end && !(isCarry(d,k) && getRun(d,k)[0] <= end)) return;
